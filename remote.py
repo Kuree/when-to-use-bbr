@@ -1,69 +1,160 @@
-# the implementation is based on
-# https://github.com/mininet/mininet/blob/master/examples/cluster.py
-# includes some bug fixes
-# heavily refactor for modern Python syntax
-
-import mininet.node
-import mininet.link
-import mininet.util
-import re
+from signal import signal, SIGINT, SIG_IGN
+from subprocess import Popen, PIPE, STDOUT
 import os
-import pwd
-import subprocess
+from random import randrange
+import sys
+import re
+from itertools import groupby
+from operator import attrgetter
+from distutils.version import StrictVersion
+
+from mininet.node import Node, Host, OVSSwitch, Controller
+from mininet.link import Link, Intf
+from mininet.net import Mininet
+from mininet.topo import LinearTopo
+from mininet.topolib import TreeTopo
+from mininet.util import quietRun, errRun, decode
+from mininet.examples.clustercli import CLI
+from mininet.log import setLogLevel, debug, info, error
+from mininet.clean import addCleanupCallback
 
 
-def find_user():
-    return pwd.getpwuid(os.getuid())[0]
+# pylint: disable=too-many-arguments
 
 
-class RemoteNode(mininet.node.Node):
-    _ipMatchRegex = re.compile(r'\d+\.\d+\.\d+\.\d+')
+def findUser():
+    "Try to return logged-in (usually non-root) user"
+    return (
+        # If we're running sudo
+            os.environ.get('SUDO_USER', False) or
+            # Logged-in user (if we have a tty)
+            (quietRun('who am i').split() or [False])[0] or
+            # Give up and return effective user
+            quietRun('whoami').strip())
+
+
+class ClusterCleanup(object):
+    "Cleanup callback"
+
+    inited = False
+    serveruser = {}
+
+    @classmethod
+    def add(cls, server, user=''):
+        "Add an entry to server: user dict"
+        if not cls.inited:
+            addCleanupCallback(cls.cleanup)
+        if not user:
+            user = findUser()
+        cls.serveruser[server] = user
+
+    @classmethod
+    def cleanup(cls):
+        "Clean up"
+        info('*** Cleaning up cluster\n')
+        for server, user in cls.serveruser.items():
+            if server == 'localhost':
+                # Handled by mininet.clean.cleanup()
+                continue
+            else:
+                cmd = ['su', user, '-c',
+                       'ssh %s@%s sudo mn -c' % (user, server)]
+                info(cmd, '\n')
+                info(quietRun(cmd))
+
+
+# BL note: so little code is required for remote nodes,
+# we will probably just want to update the main Node()
+# class to enable it for remote access! However, there
+# are a large number of potential failure conditions with
+# remote nodes which we may want to detect and handle.
+# Another interesting point is that we could put everything
+# in a mix-in class and easily add cluster mode to 2.0.
+
+class RemoteMixin(object):
+    "A mix-in class to turn local nodes into remote nodes"
+
     # ssh base command
     # -q: don't print stupid diagnostic messages
     # BatchMode yes: don't ask for password
     # ForwardAgent yes: forward authentication credentials
-    ssh_base = ['ssh', '-q',
-                '-o', 'BatchMode=yes',
-                '-o', 'ForwardAgent=yes', '-tt']
+    sshbase = ['ssh', '-q',
+               '-o', 'BatchMode=yes',
+               '-o', 'ForwardAgent=yes', '-tt']
 
-    def __init__(self, name, server='localhost', user=None, ip=None, key=None, **kwargs):
-        self.server = server
-        self.ip = ip if ip is not None else self.find_server_ip(server)
-        self.user = user if user is not None else find_user()
-
-        # need to ssh into the server
+    def __init__(self, name, server='localhost', user=None, serverIP=None,
+                 controlPath=False, splitInit=False, **kwargs):
+        """Instantiate a remote node
+           name: name of remote node
+           server: remote server (optional)
+           user: user on remote server (optional)
+           controlPath: specify shared ssh control path (optional)
+           splitInit: split initialization?
+           **kwargs: see Node()"""
+        # We connect to servers by IP address
+        self.server = server if server else 'localhost'
+        self.serverIP = (serverIP if serverIP
+                         else self.findServerIP(self.server))
+        self.user = user if user else findUser()
+        ClusterCleanup.add(server=server, user=user)
+        if controlPath is True:
+            # Set a default control path for shared SSH connections
+            controlPath = '/tmp/mn-%r@%h:%p'
+        self.controlPath = controlPath
+        self.splitInit = splitInit
         if self.user and self.server != 'localhost':
-            self.ssh_dest = f"{self.user}@{self.server}"
-            self.ssh_cmd = ["sudo", "-E", "-u", self.user] + self.ssh_base
-            if key is not None:
-                # use key if provided
-                self.ssh_cmd += ["-i", key]
-            self.is_remote = True
+            self.dest = '%s@%s' % (self.user, self.serverIP)
+            self.sshcmd = ['sudo', '-E', '-u', self.user] + self.sshbase
+            if self.controlPath:
+                self.sshcmd += ['-o', 'ControlPath=' + self.controlPath,
+                                '-o', 'ControlMaster=auto',
+                                '-o', 'ControlPersist=' + '1']
+            self.sshcmd += [self.dest]
+            self.isRemote = True
         else:
-            self.ssh_dest = ""
-            self.ssh_cmd = []
-            self.is_remote = False
-        self.shell = None
+            self.dest = None
+            self.sshcmd = []
+            self.isRemote = False
+        # Satisfy pylint
+        self.shell, self.pid = None, None
+        super(RemoteMixin, self).__init__(name, **kwargs)
 
-        super().__init__(name, **kwargs)
+    # Determine IP address of local host
+    _ipMatchRegex = re.compile(r'\d+\.\d+\.\d+\.\d+')
 
-        self.pid = int(self.waitOutput())
+    @classmethod
+    def findServerIP(cls, server):
+        "Return our server's IP address"
+        # First, check for an IP address
+        ipmatch = cls._ipMatchRegex.findall(server)
+        if ipmatch:
+            return ipmatch[0]
+        # Otherwise, look up remote server
+        output = quietRun('getent ahostsv4 %s' % server)
+        ips = cls._ipMatchRegex.findall(output)
+        ip = ips[0] if ips else None
+        return ip
 
     # Command support via shell process in namespace
     def startShell(self, *args, **kwargs):
-        """Start a shell process for running commands"""
-        if self.is_remote:
+        "Start a shell process for running commands"
+        if self.isRemote:
             kwargs.update(mnopts='-c')
-        print("start shell", args, kwargs)
-        super().startShell(*args, **kwargs)
+        super(RemoteMixin, self).startShell(*args, **kwargs)
         # Optional split initialization
         self.sendCmd('echo $$')
+        if not self.splitInit:
+            self.finishInit()
+
+    def finishInit(self):
+        "Wait for split initialization to complete"
+        self.pid = int(self.waitOutput())
 
     def rpopen(self, *cmd, **opts):
-        """Return a Popen object on underlying server in root namespace"""
-        params = {'stdin': subprocess.PIPE,
-                  'stdout': subprocess.PIPE,
-                  'stderr': subprocess.STDOUT,
+        "Return a Popen object on underlying server in root namespace"
+        params = {'stdin': PIPE,
+                  'stdout': PIPE,
+                  'stderr': STDOUT,
                   'sudo': True}
         params.update(opts)
         return self._popen(*cmd, **params)
@@ -74,20 +165,21 @@ class RemoteNode(mininet.node.Node):
            args: string or list of strings
            returns: stdout and stderr"""
         popen = self.rpopen(*cmd, **opts)
+        # info( 'RCMD: POPEN:', popen, '\n' )
         # These loops are tricky to get right.
         # Once the process exits, we can read
         # EOF twice if necessary.
         result = ''
         while True:
             poll = popen.poll()
-            result += popen.stdout.read().decode("ascii")
+            result += decode(popen.stdout.read())
             if poll is not None:
                 break
         return result
 
     @staticmethod
     def _ignoreSignal():
-        """Detach from process group to ignore all signals"""
+        "Detach from process group to ignore all signals"
         os.setpgrp()
 
     def _popen(self, cmd, sudo=True, tt=True, **params):
@@ -97,14 +189,14 @@ class RemoteNode(mininet.node.Node):
             returns: Popen() object"""
         if isinstance(cmd, str):
             cmd = cmd.split()
-        if self.is_remote:
+        if self.isRemote:
             if sudo:
                 cmd = ['sudo', '-E'] + cmd
             if tt:
-                cmd = self.ssh_cmd + cmd
+                cmd = self.sshcmd + cmd
             else:
                 # Hack: remove -tt
-                sshcmd = list(self.ssh_cmd)
+                sshcmd = list(self.sshcmd)
                 sshcmd.remove('-tt')
                 cmd = sshcmd + cmd
         else:
@@ -112,35 +204,80 @@ class RemoteNode(mininet.node.Node):
                 # Drop privileges
                 cmd = ['sudo', '-E', '-u', self.user] + cmd
         params.update(preexec_fn=self._ignoreSignal)
-        popen = super()._popen(cmd, **params)
+        debug('_popen', cmd, '\n')
+        popen = super(RemoteMixin, self)._popen(cmd, **params)
         return popen
 
     def popen(self, *args, **kwargs):
-        """Override: disable -tt"""
-        return super().popen(*args, tt=False, **kwargs)
+        "Override: disable -tt"
+        return super(RemoteMixin, self).popen(*args, tt=False, **kwargs)
+
+    def addIntf(self, *args, **kwargs):
+        "Override: use RemoteLink.moveIntf"
+        # kwargs.update( moveIntfFn=RemoteLink.moveIntf )
+        # pylint: disable=useless-super-delegation
+        return super(RemoteMixin, self).addIntf(*args, **kwargs)
+
+
+class RemoteNode(RemoteMixin, Node):
+    "A node on a remote server"
+    pass
+
+
+class RemoteHost(RemoteNode):
+    "A RemoteHost is simply a RemoteNode"
+    pass
+
+
+class RemoteOVSSwitch(RemoteMixin, OVSSwitch):
+    "Remote instance of Open vSwitch"
+
+    OVSVersions = {}
+
+    def __init__(self, *args, **kwargs):
+        # No batch startup yet
+        kwargs.update(batch=True)
+        super(RemoteOVSSwitch, self).__init__(*args, **kwargs)
+
+    def isOldOVS(self):
+        "Is remote switch using an old OVS version?"
+        cls = type(self)
+        if self.server not in cls.OVSVersions:
+            # pylint: disable=not-callable
+            vers = self.cmd('ovs-vsctl --version')
+            # pylint: enable=not-callable
+            cls.OVSVersions[self.server] = re.findall(
+                r'\d+\.\d+', vers)[0]
+        return (StrictVersion(cls.OVSVersions[self.server]) <
+                StrictVersion('1.10'))
 
     @classmethod
-    def find_server_ip(cls, server):
-        # First, check for an IP address
-        ip_match = cls._ipMatchRegex.findall(server)
-        if ip_match:
-            return ip_match[0]
-        # Otherwise, look up remote server
-        output = mininet.util.quietRun(f'getent ahostsv4 {server}')
-        ips = cls._ipMatchRegex.findall(output)
-        ip = ips[0] if ips else None
-        return ip
+    # pylint: disable=arguments-differ
+    def batchStartup(cls, switches, **_kwargs):
+        "Start up switches in per-server batches"
+        key = attrgetter('server')
+        for server, switchGroup in groupby(sorted(switches, key=key), key):
+            info('(%s)' % server)
+            group = tuple(switchGroup)
+            switch = group[0]
+            OVSSwitch.batchStartup(group, run=switch.cmd)
+        return switches
+
+    @classmethod
+    # pylint: disable=arguments-differ
+    def batchShutdown(cls, switches, **_kwargs):
+        "Stop switches in per-server batches"
+        key = attrgetter('server')
+        for server, switchGroup in groupby(sorted(switches, key=key), key):
+            info('(%s)' % server)
+            group = tuple(switchGroup)
+            switch = group[0]
+            OVSSwitch.batchShutdown(group, run=switch.rcmd)
+        return switches
 
 
-class RemoteSwitch(RemoteNode, mininet.node.OVSSwitch):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.user = find_user()
-        self.server = "localhost"
-
-
-class RemoteLink(mininet.link.Link):
-    """A RemoteLink is a link between nodes which may be on different servers"""
+class RemoteLink(Link):
+    "A RemoteLink is a link between nodes which may be on different servers"
 
     def __init__(self, node1, node2, **kwargs):
         """Initialize a RemoteLink
@@ -151,17 +288,17 @@ class RemoteLink(mininet.link.Link):
         self.tunnel = None
         kwargs.setdefault('params1', {})
         kwargs.setdefault('params2', {})
-        self.cmd = None
-        super().__init__(node1, node2, **kwargs)
+        self.cmd = None  # satisfy pylint
+        Link.__init__(self, node1, node2, **kwargs)
 
     def stop(self):
-        """Stop this link"""
+        "Stop this link"
         if self.tunnel:
             self.tunnel.terminate()
             self.intf1.delete()
             self.intf2.delete()
         else:
-            mininet.link.Link.stop(self)
+            Link.stop(self)
         self.tunnel = None
 
     def makeIntfPair(self, intfname1, intfname2, addr1=None, addr2=None,
@@ -177,8 +314,8 @@ class RemoteLink(mininet.link.Link):
         server2 = getattr(node2, 'server', 'localhost')
         if server1 == server2:
             # Link within same server
-            return mininet.link.Link.makeIntfPair(intfname1, intfname2, addr1, addr2,
-                                                  node1, node2, deleteIntfs=deleteIntfs)
+            return Link.makeIntfPair(intfname1, intfname2, addr1, addr2,
+                                     node1, node2, deleteIntfs=deleteIntfs)
         # Otherwise, make a tunnel
         self.tunnel = self.makeTunnel(node1, node2, intfname1, intfname2,
                                       addr1, addr2)
@@ -199,15 +336,17 @@ class RemoteLink(mininet.link.Link):
 
     def makeTunnel(self, node1, node2, intfname1, intfname2,
                    addr1=None, addr2=None):
-        """Make a tunnel across switches on different servers"""
+        "Make a tunnel across switches on different servers"
         # We should never try to create a tunnel to ourselves!
-        # some nodes may not have server
+        assert node1.server != node2.server
         # And we can't ssh into this server remotely as 'localhost',
-        # so try again swapping node1 and node2
+        # so try again swappping node1 and node2
         if node2.server == 'localhost':
             return self.makeTunnel(node1=node2, node2=node1,
                                    intfname1=intfname2, intfname2=intfname1,
                                    addr1=addr2, addr2=addr1)
+        debug('\n*** Make SSH tunnel ' + node1.server + ':' + intfname1 +
+              ' == ' + node2.server + ':' + intfname2)
         # 1. Create tap interfaces
         for node in node1, node2:
             # For now we are hard-wiring tap9, which we will rename
@@ -225,9 +364,10 @@ class RemoteLink(mininet.link.Link):
         tunnel = node1.rpopen(cmd, sudo=False)
         # When we receive the character '@', it means that our
         # tunnel should be set up
-        ch = tunnel.stdout.read(1).decode("ascii")
+        debug('Waiting for tunnel to come up...\n')
+        ch = decode(tunnel.stdout.read(1))
         if ch != '@':
-            ch += tunnel.stdout.read().decode("ascii")
+            ch += decode(tunnel.stdout.read())
             cmd = ' '.join(cmd)
             raise Exception('makeTunnel:\n'
                             'Tunnel setup failed for '
@@ -252,7 +392,7 @@ class RemoteLink(mininet.link.Link):
         return tunnel
 
     def status(self):
-        """Detailed representation of link"""
+        "Detailed representation of link"
         if self.tunnel:
             if self.tunnel.poll() is not None:
                 status = "Tunnel EXITED %s" % self.tunnel.returncode
@@ -261,5 +401,12 @@ class RemoteLink(mininet.link.Link):
                     self.tunnel.pid, self.cmd)
         else:
             status = "OK"
-        result = "%s %s" % (mininet.link.Link.status(self), status)
+        result = "%s %s" % (Link.status(self), status)
         return result
+
+
+class RemoteSSHLink(RemoteLink):
+    "Remote link using SSH tunnels"
+
+    def __init__(self, node1, node2, **kwargs):
+        RemoteLink.__init__(self, node1, node2, **kwargs)

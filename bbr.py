@@ -7,7 +7,7 @@ import mininet.net
 import mininet.util
 import mininet.clean
 
-from remote import RemoteNode, RemoteLink, RemoteSwitch
+from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
 
 
 class Topology(mininet.topo.Topo):
@@ -33,7 +33,11 @@ def run(configs):
     # clean up previous mininet runs in case of crashes
     mininet.clean.cleanup()
     topology = Topology(configs)
-    net = mininet.net.Mininet(topology, host=RemoteNode, link=RemoteLink, switch=RemoteSwitch, waitConnected=True)
+    if configs.remote_host != "localhost":
+        net = mininet.net.Mininet(topology, host=RemoteHost, link=RemoteSSHLink, switch=RemoteOVSSwitch,
+                                  waitConnected=True)
+    else:
+        net = mininet.net.Mininet(topology, host=mininet.node.CPULimitedHost, link=mininet.link.TCLink)
     net.start()
 
     if configs.debug:
