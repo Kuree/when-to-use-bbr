@@ -10,7 +10,6 @@ import mininet.util
 class Topology(mininet.topo.Topo):
     def __init__(self, config):
         self.config = config
-        self.named_hosts = {}
         # in Section 3.1, the paper mentioned that the delay between h1/h2 and h3 is 40us
         self._min_delay = "{0}us".format(40 / 2)
         super(Topology, self).__init__()
@@ -19,15 +18,12 @@ class Topology(mininet.topo.Topo):
         h1 = self.addHost("h1")
         h2 = self.addHost("h2")
         h3 = self.addHost("h3")
-        s = self.addSwitch("s")
-
-        # set up named hosts
-        self.named_hosts = {"h1": h1, "h2": h2, "h3": h3, "s": s}
+        s1 = self.addSwitch("s1")
 
         # add link
-        self.addLink(h1, s, bw=self.config.bw, delay=self._min_delay)
-        self.addLink(h2, s, bw=self.config.bw, delay=self._min_delay)
-        self.addLink(s, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
+        self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay)
+        self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay)
+        self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
 
 
 def run(configs):
