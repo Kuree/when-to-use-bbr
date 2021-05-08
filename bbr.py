@@ -20,7 +20,8 @@ class Topology(mininet.topo.Topo):
     def build(self):
         h1 = self.addHost("h1")
         h2 = self.addHost("h2")
-        h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user)
+        h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user,
+                          port=self.config.remote_host_port)
         s1 = self.addSwitch("s1")
 
         # add link
@@ -59,8 +60,12 @@ def main():
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
     parser.add_argument("-s", "--size", "--buffer-size", choices=[0.1, 1, 10, 20, 50], default=0.1,
                         help="Switch buffer size", type=float, dest="size")
-    parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host")
-    parser.add_argument("--remote-user", default="", type=str, dest="remote_user")
+    parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
+                        help="remote host name/IP address")
+    parser.add_argument("--remote-host-port", default=22, type=int, dest="remote_host_port",
+                        help="remote host port number to ssh in")
+    parser.add_argument("--remote-user", default="", type=str, dest="remote_user",
+                        help="remote host user name")
     parser.add_argument("--debug", action="store_true",  dest="debug")
     args = parser.parse_args()
 

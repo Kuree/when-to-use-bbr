@@ -82,7 +82,7 @@ class RemoteMixin(object):
                '-o', 'BatchMode=yes',
                '-o', 'ForwardAgent=yes', '-tt']
 
-    def __init__(self, name, server='localhost', user=None, serverIP=None,
+    def __init__(self, name, server='localhost', user=None, serverIP=None, port=None,
                  controlPath=False, splitInit=False, **kwargs):
         """Instantiate a remote node
            name: name of remote node
@@ -105,6 +105,8 @@ class RemoteMixin(object):
         if self.user and self.server != 'localhost':
             self.dest = '%s@%s' % (self.user, self.serverIP)
             self.sshcmd = ['sudo', '-E', '-u', self.user] + self.sshbase
+            if port is not None:
+                self.sshcmd += ["-p", str(port)]
             if self.controlPath:
                 self.sshcmd += ['-o', 'ControlPath=' + self.controlPath,
                                 '-o', 'ControlMaster=auto',
