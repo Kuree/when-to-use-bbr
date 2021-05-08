@@ -1,21 +1,18 @@
-from signal import signal, SIGINT, SIG_IGN
-from subprocess import Popen, PIPE, STDOUT
+# code copied from
+# https://github.com/mininet/mininet/blob/master/examples/cluster.py
+# with some minor changes
+
+from subprocess import PIPE, STDOUT
 import os
-from random import randrange
-import sys
 import re
 from itertools import groupby
 from operator import attrgetter
 from distutils.version import StrictVersion
 
-from mininet.node import Node, Host, OVSSwitch, Controller
-from mininet.link import Link, Intf
-from mininet.net import Mininet
-from mininet.topo import LinearTopo
-from mininet.topolib import TreeTopo
-from mininet.util import quietRun, errRun, decode
-from mininet.examples.clustercli import CLI
-from mininet.log import setLogLevel, debug, info, error
+from mininet.node import Node, OVSSwitch
+from mininet.link import Link
+from mininet.util import quietRun, decode
+from mininet.log import debug, info
 from mininet.clean import addCleanupCallback
 
 
