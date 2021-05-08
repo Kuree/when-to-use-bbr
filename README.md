@@ -15,3 +15,20 @@ sudo modprobe tcp_bbr
 # check to see if BBR is available in the kernel
 cat /proc/sys/net/ipv4/tcp_available_congestion_control
 ```
+
+### Setting up VM for local unit test
+For unit test, we assume you have two Mininet VMs running in your host OS and they can talk
+to each other. The easiest way to set up the network is to use `Bridged Adapter` in the
+networking option.
+
+In addition, the "remote host" needs to change its `sshd` default permission to allow SSH
+tunnelling:
+
+1. Add the following to `/etc/ssh/sshd_config
+    ```
+    PermitTunnel yes
+    ```
+2. Then restart the `sshd` service:
+    ```
+    sudo systemctl restart ssh.service
+    ```
