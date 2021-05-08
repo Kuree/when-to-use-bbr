@@ -1,4 +1,9 @@
-# Install
+# Reproducing Network Research
+This is our final project for Stanford CS224 for the paper:
+[When to use and when not to use BBR: An empirical analysis
+and evaluation study](https://www3.cs.stonybrook.edu/~arunab/papers/imc19_bbr.pdf)
+
+## Install
 
 ### Setting up Mininet VM
 We use the VM recommended by the Mininet (Ubuntu 20.04.1 VM image). You can download the image
