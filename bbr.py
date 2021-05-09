@@ -44,26 +44,29 @@ def setup_iperf_server(node, port):
 
 
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
-                 total_time: float, port: int, cc: str, out: str):
+                 total_time: float, port: int, cc: str, out: str, bw: str):
     # we assume the server code is in the same directory
     # hard-code some values
     print_interval = total_time / 10.0
     target_ip = node_to.IP()
-    cmd = f"iperf -c {target_ip} -Z {cc} -p {port} -t {total_time} -i {print_interval} > {out}"
+    cmd = f"iperf -c {target_ip} -b {bw} -Z {cc} -p {port} -t {total_time} -e -i {print_interval} > {out}"
     node_from.cmd(cmd, shell=True)
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
     # hardcode some stuff here
     tcp_port = 9999
+    bw = f"{configs.bw}m"
     h1 = net.get("h1")
     h2 = net.get("h2")
     h3 = net.get("h3")
     h1_result = os.path.join(configs.output, "h1.iperf")
     h2_result = os.path.join(configs.output, "h2.iperf")
     h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, h1_result))
-    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, h2_result))
+    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, h1_result,
+                                                                 bw))
+    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, h2_result,
+                                                                 bw))
 
     h3_proc.start()
     time.sleep(0.1)
