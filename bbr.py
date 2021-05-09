@@ -59,9 +59,11 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     h1 = net.get("h1")
     h2 = net.get("h2")
     h3 = net.get("h3")
+    h1_result = os.path.join(configs.output, "h1.iperf")
+    h2_result = os.path.join(configs.output, "h2.iperf")
     h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, "h1.txt"))
-    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, "h2.txt"))
+    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, h1_result))
+    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, h2_result))
 
     h3_proc.start()
     time.sleep(0.1)
@@ -83,6 +85,10 @@ def cleanup(processes):
 def run(configs):
     # clean up previous mininet runs in case of crashes
     mininet.clean.cleanup()
+    # if output directory doesn't exist, create them
+    if not os.path.exists(configs.output):
+        os.makedirs(configs.output, exist_ok=True)
+
     topology = Topology(configs)
     if configs.remote_host != "localhost":
         net = mininet.net.Mininet(topology, host=RemoteHost, link=RemoteSSHLink, switch=RemoteOVSSwitch,
@@ -120,6 +126,8 @@ def main():
     parser.add_argument("-t", "--time", default=60, type=int, help="How long should the experiment run",
                         dest="time")
     parser.add_argument("--debug", action="store_true", dest="debug")
+    parser.add_argument("-o", "--output", type=str, dest="output", help="Output directory for the experiment",
+                        default="out")
     args = parser.parse_args()
 
     # run the experiments
