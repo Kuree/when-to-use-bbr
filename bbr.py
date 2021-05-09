@@ -35,41 +35,45 @@ class Topology(mininet.topo.Topo):
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
 
 
-def setup_iperf_server(node, port):
-    # make sure TCP is flow is not receiver window limited
-    cmd = f"iperf -s -w 16m -p {port}"
+def setup_iperf_server(node, port1, port2):
+    # iperf3 only allow one test per server
+    cmd1 = f"iperf3 -s -p {port1} -4"
+    cmd2 = f"iperf3 -s -p {port2} -4"
     # prevent blocking
     with open(os.devnull, "w") as null:
-        node.cmd(cmd, stdout=null)
+        node.popen(cmd1, stdout=null, stderr=sys.stderr)
+        node.popen(cmd2, stdout=null, stderr=sys.stderr)
 
 
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
-                 total_time: float, port: int, cc: str, out: str, bw: str):
-    # we assume the server code is in the same directory
-    # hard-code some values
-    print_interval = total_time / 10.0
+                 total_time: float, port: int, cc: str, out: str):
     target_ip = node_to.IP()
-    cmd = f"iperf -c {target_ip} -b {bw} -Z {cc} -p {port} -t {total_time} -e -i {print_interval} > {out}"
+    # we output json file
+    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -w 16m -t {total_time} -i 0 -J --logfile {out} -4"
     node_from.cmd(cmd, shell=True)
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
     # hardcode some stuff here
-    tcp_port = 9999
-    bw = f"{configs.bw}m"
+    tcp_port1 = 9998
+    tcp_port2 = 9999
     h1 = net.get("h1")
     h2 = net.get("h2")
     h3 = net.get("h3")
-    h1_result = os.path.join(configs.output, "h1.iperf")
-    h2_result = os.path.join(configs.output, "h2.iperf")
-    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, h1_result,
-                                                                 bw))
-    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, h2_result,
-                                                                 bw))
+    h1_result = os.path.join(configs.output, "h1.json")
+    h2_result = os.path.join(configs.output, "h2.json")
+    # need to remove this file if already exists
+    for filename in {h1_result, h2_result}:
+        if os.path.exists(filename):
+            os.remove(filename)
+    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2))
+    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port1, configs.cc,
+                                                                 h1_result))
+    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port2, configs.cc,
+                                                                 h2_result))
 
     h3_proc.start()
-    time.sleep(0.1)
+    time.sleep(0.5)
     h1_proc.start()
     h2_proc.start()
 

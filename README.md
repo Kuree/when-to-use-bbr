@@ -9,7 +9,10 @@ and evaluation study](https://www3.cs.stonybrook.edu/~arunab/papers/imc19_bbr.pd
 We use the VM recommended by the Mininet (Ubuntu 20.04.1 VM image). You can download the image
 [here](https://github.com/mininet/mininet/releases/tag/2.3.0).
 
-### Setting up BBR on Mininet VM
+### Setting Mininet VM
+We need some packages that's not installed by default in the Mininet VM
+
+#### BBR Kernel Module
 ```bash
 sudo apt update
 sudo apt install -y linux-generic-hwe-20.04
@@ -20,6 +23,14 @@ sudo modprobe tcp_bbr
 # check to see if BBR is available in the kernel
 cat /proc/sys/net/ipv4/tcp_available_congestion_control
 ```
+
+#### iperf3
+We use modern `iperf3` instead of `iperf`.
+
+```bash
+sudo apt update && sudo apt install -y iperf3
+```
+
 
 ### Setting up VM for local unit test
 For unit test, we assume you have two Mininet VMs running in your host OS and they can talk
