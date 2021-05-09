@@ -24,25 +24,27 @@ class Topology(mininet.topo.Topo):
 
     def build(self):
         h1 = self.addHost("h1")
-        h2 = self.addHost("h2")
         h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user,
                           port=self.config.remote_host_port)
         s1 = self.addSwitch("s1")
-
         # add link
         self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay)
-        self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay)
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
 
+        if self.config.h2:
+            h2 = self.addHost("h2")
+            self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay)
 
-def setup_iperf_server(node, port1, port2):
+
+def setup_iperf_server(node, port1, port2=None):
     # iperf3 only allow one test per server
     cmd1 = f"iperf3 -s -p {port1} -4"
     cmd2 = f"iperf3 -s -p {port2} -4"
     # prevent blocking
     with open(os.devnull, "w") as null:
         node.popen(cmd1, stdout=null, stderr=sys.stderr)
-        node.popen(cmd2, stdout=null, stderr=sys.stderr)
+        if port2 is not None:
+            node.popen(cmd2, stdout=null, stderr=sys.stderr)
 
 
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
@@ -56,9 +58,8 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
 def setup_nodes(net: mininet.net.Mininet, configs):
     # hardcode some stuff here
     tcp_port1 = 9998
-    tcp_port2 = 9999
+    tcp_port2 = 9999 if configs.h2 else None
     h1 = net.get("h1")
-    h2 = net.get("h2")
     h3 = net.get("h3")
     h1_result = os.path.join(configs.output, "h1.json")
     h2_result = os.path.join(configs.output, "h2.json")
@@ -69,13 +70,18 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2))
     h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port1, configs.cc,
                                                                  h1_result))
-    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port2, configs.cc,
-                                                                 h2_result))
+    if configs.h2:
+        h2 = net.get("h2")
+        h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port2, configs.h2_cc,
+                                                                     h2_result))
+    else:
+        h2_proc = None
 
     h3_proc.start()
     time.sleep(0.5)
     h1_proc.start()
-    h2_proc.start()
+    if configs.h2:
+        h2_proc.start()
 
     processes = [h3_proc, h1_proc, h2_proc]
     return processes
@@ -84,7 +90,8 @@ def setup_nodes(net: mininet.net.Mininet, configs):
 def cleanup(processes):
     h3_proc, h1_proc, h2_proc = processes
     for p in {h1_proc, h2_proc}:
-        p.join()
+        if p is not None:
+            p.join()
     h3_proc.kill()
     mininet.clean.cleanup()
 
@@ -117,7 +124,7 @@ def run(configs):
 def main():
     parser = argparse.ArgumentParser("BBR experiments")
     parser.add_argument("-c", "--congestion-control", choices=["bbr", "cubic"], default="bbr",
-                        help="h1 and h2 congestion control algorithm type", type=str, dest="cc")
+                        help="h1 congestion control algorithm type", type=str, dest="cc")
     parser.add_argument("--rtt", choices=[5, 10, 25, 50, 75, 100, 150, 200], default=5,
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 1000], default=10,
@@ -135,6 +142,10 @@ def main():
     parser.add_argument("--debug", action="store_true", dest="debug")
     parser.add_argument("-o", "--output", type=str, dest="output", help="Output directory for the experiment",
                         default="out")
+    # whether to add h2
+    parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
+    parser.add_argument("--h2-cc", default="bbr", choices=["bbr", "cubic"],
+                        help="h1 congestion control algorithm type", type=str, dest="h2_cc")
     args = parser.parse_args()
 
     # run the experiments
