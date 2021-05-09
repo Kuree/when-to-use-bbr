@@ -1,0 +1,28 @@
+name: CI Test
+
+on: [push, pull_request]
+
+jobs:
+  mininet:
+    if: "!contains(github.event.head_commit.message, 'skip ci')"
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Latest Mininet
+      shell: bash
+      run: |
+        sudo apt update
+        cd /tmp
+        git clone git://github.com/mininet/mininet
+        cd mininet
+        util/install.sh -v -n
+        sudo mn --switch ovsbr --test pingall
+    - name: Install deps
+      shell: bash
+      run: |
+        sudo apt install -y iperf3
+    - name: Single host
+      shell: bash
+      run: |
+        sudo python3 bbr.py --debug -c cubic -t 2 # bbr is not available in the image
