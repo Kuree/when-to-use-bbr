@@ -31,7 +31,8 @@ class Topology(mininet.topo.Topo):
         s1 = self.addSwitch("s1")
         # add link
         self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay)
-        self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
+        self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
+                     loss=self.config.loss)
 
         if self.config.h2:
             h2 = self.addHost("h2")
@@ -168,6 +169,7 @@ def main():
     parser.add_argument("--debug", action="store_true", dest="debug")
     parser.add_argument("-o", "--output", type=str, dest="output", help="Output directory for the experiment",
                         default="out")
+    parser.add_argument("-l", "--loss", type=float, default=0, dest="loss", help="Link loss rate")
     # whether to add h2
     parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
     parser.add_argument("--h2-cc", default="bbr", choices=["bbr", "cubic"],
