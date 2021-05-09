@@ -49,8 +49,8 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
                  total_time: float, port: int, cc: str, out: str):
     target_ip = node_to.IP()
     # we output json file
-    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -w 16m -t {total_time} -i 0 -J --logfile {out} -4"
-    node_from.cmd(cmd, shell=True)
+    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -t {total_time} -i 0 -J --logfile {out} -4"
+    node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
