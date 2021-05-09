@@ -11,8 +11,10 @@ import mininet.clean
 import os
 import multiprocessing
 import sys
+import typing
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
+from util import get_iperf_metrics
 
 
 class Topology(mininet.topo.Topo):
@@ -35,6 +37,12 @@ class Topology(mininet.topo.Topo):
             h2 = self.addHost("h2")
             self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay)
 
+    def get_senders(self):
+        if self.config.h2:
+            return ["h1", "h2"]
+        else:
+            return ["h1"]
+
 
 def setup_iperf_server(node, port1, port2=None):
     # iperf3 only allow one test per server
@@ -55,14 +63,22 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
 
+def get_filename(node: typing.Union[mininet.node.Node, str], configs):
+    name = node if isinstance(node, str) else node.name
+    buffer_size = configs.size
+    rtt = configs.rtt
+    bw = configs.bw
+    return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}.json")
+
+
 def setup_nodes(net: mininet.net.Mininet, configs):
     # hardcode some stuff here
     tcp_port1 = 9998
     tcp_port2 = 9999 if configs.h2 else None
     h1 = net.get("h1")
     h3 = net.get("h3")
-    h1_result = os.path.join(configs.output, "h1.json")
-    h2_result = os.path.join(configs.output, "h2.json")
+    h1_result = get_filename(h1, configs)
+    h2_result = get_filename("h2", configs)
     # need to remove this file if already exists
     for filename in {h1_result, h2_result}:
         if os.path.exists(filename):
@@ -96,6 +112,14 @@ def cleanup(processes):
     mininet.clean.cleanup()
 
 
+def check_output(topology: Topology, configs):
+    # check if we generate the outputs properly
+    nodes = topology.get_senders()
+    for node in nodes:
+        filename = get_filename(node, configs)
+        get_iperf_metrics(filename)
+
+
 def run(configs):
     # clean up previous mininet runs in case of crashes
     mininet.clean.cleanup()
@@ -119,6 +143,8 @@ def run(configs):
     processes = setup_nodes(net, configs)
     # clean up at the end
     cleanup(processes)
+    # check if we got everything
+    check_output(topology, configs)
 
 
 def main():
