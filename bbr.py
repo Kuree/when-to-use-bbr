@@ -1,4 +1,6 @@
 import argparse
+import time
+
 import mininet.topo
 import mininet.net
 import mininet.node
@@ -6,6 +8,9 @@ import mininet.link
 import mininet.net
 import mininet.util
 import mininet.clean
+import os
+import multiprocessing
+import sys
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
 
@@ -30,6 +35,51 @@ class Topology(mininet.topo.Topo):
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2))
 
 
+def setup_iperf_server(node, port):
+    # make sure TCP is flow is not receiver window limited
+    cmd = f"iperf -s -w 16m -p {port}"
+    # prevent blocking
+    with open(os.devnull, "w") as null:
+        node.cmd(cmd, stdout=null)
+
+
+def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
+                 total_time: float, port: int, cc: str, out: str):
+    # we assume the server code is in the same directory
+    # hard-code some values
+    print_interval = total_time / 10.0
+    target_ip = node_to.IP()
+    cmd = f"iperf -c {target_ip} -Z {cc} -p {port} -t {total_time} -i {print_interval} > {out}"
+    node_from.cmd(cmd, shell=True)
+
+
+def setup_nodes(net: mininet.net.Mininet, configs):
+    # hardcode some stuff here
+    tcp_port = 9999
+    h1 = net.get("h1")
+    h2 = net.get("h2")
+    h3 = net.get("h3")
+    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port))
+    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port, configs.cc, "h1.txt"))
+    h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port, configs.cc, "h2.txt"))
+
+    h3_proc.start()
+    time.sleep(0.1)
+    h1_proc.start()
+    h2_proc.start()
+
+    processes = [h3_proc, h1_proc, h2_proc]
+    return processes
+
+
+def cleanup(processes):
+    h3_proc, h1_proc, h2_proc = processes
+    for p in {h1_proc, h2_proc}:
+        p.join()
+    h3_proc.kill()
+    mininet.clean.cleanup()
+
+
 def run(configs):
     # clean up previous mininet runs in case of crashes
     mininet.clean.cleanup()
@@ -46,8 +96,9 @@ def run(configs):
         mininet.util.dumpNetConnections(net)
         net.pingAll()
 
+    processes = setup_nodes(net, configs)
     # clean up at the end
-    mininet.clean.cleanup()
+    cleanup(processes)
 
 
 def main():
@@ -66,7 +117,9 @@ def main():
                         help="remote host port number to ssh in")
     parser.add_argument("--remote-user", default="", type=str, dest="remote_user",
                         help="remote host user name")
-    parser.add_argument("--debug", action="store_true",  dest="debug")
+    parser.add_argument("-t", "--time", default=60, type=int, help="How long should the experiment run",
+                        dest="time")
+    parser.add_argument("--debug", action="store_true", dest="debug")
     args = parser.parse_args()
 
     # run the experiments
