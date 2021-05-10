@@ -12,6 +12,7 @@ import os
 import multiprocessing
 import sys
 import typing
+import subprocess
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
 from util import get_iperf_metrics
@@ -50,10 +51,9 @@ def setup_iperf_server(node, port1, port2):
     cmd1 = f"iperf3 -s -p {port1} -4"
     cmd2 = f"iperf3 -s -p {port2} -4"
     # prevent blocking
-    with open(os.devnull, "w") as null:
-        node.popen(cmd1, stdout=null, stderr=sys.stderr)
-        if port2 is not None:
-            node.popen(cmd2, stdout=null, stderr=sys.stderr)
+    node.popen(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if port2 is not None:
+        node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,

@@ -29,6 +29,6 @@ jobs:
     - name: Batch run script
       shell: bash
       run: |
-        sudo ./run mininet -t -1 --rtt-range 5 10 --bw-range 10 --size 0.1 1 --cc1 cubic -o batch
+        sudo ./run mininet -t 1 --rtt-range 5 10 --bw-range 10 --size 0.1 1 --cc1 cubic -o batch
         # use the utility script to ensure we have proper data
         python3 util.py batch
