@@ -1,5 +1,7 @@
 import matplotlib
 import argparse
+import seaborn
+import pandas as pd
 import numpy as np
 from util import get_all_metrics, parse_name_config, config_param_names
 
@@ -26,6 +28,15 @@ def get_configs():
 def compute_gain(mat1, mat2):
     # in this case mat1 is bbr and mat2 is cubic
     return np.divide(np.subtract(mat1, mat2), mat2)
+
+
+def get_heatmap_dataframe(mat, x_values, y_values, names):
+    result = []
+    for y in range(len(y_values)):
+        for x in range(len(x_values)):
+            result.append((x_values[x], y_values[y], mat[y][x]))
+
+    return pd.DataFrame(result, columns=names)
 
 
 def plot_heatmap(configs):
@@ -83,6 +94,19 @@ def plot_heatmap(configs):
                 mat2[y][x] = met2[2]
 
     gain = compute_gain(mat1 + mat1, mat2)
+    # prepare panda dataframe
+
+    df = get_heatmap_dataframe(gain, x_values, y_values, [configs.y, configs.x, "value"])
+    df = df.pivot(configs.y, configs.x, "value")
+    ax = seaborn.heatmap(df)
+    # set labels if necessary
+    if configs.x == "rtt":
+        ax.set_xlabel("RTT (ms)")
+    if configs.y == "bw":
+        ax.set_ylabel("Bandwidth (Mbps)")
+
+    fig = ax.get_figure()
+    fig.savefig(configs.out)
 
 
 def main():
