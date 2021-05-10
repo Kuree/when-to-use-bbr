@@ -17,6 +17,12 @@ def parse_args():
         p.add_argument("-o", "--out", default="out", help="Output folder", type=str, dest="out")
         p.add_argument("-t", "--time", default=60, help="Test duration", type=int, dest="time")
         p.add_argument("--debug", action="store_true", help="Add debug actions", dest="debug")
+        p.add_argument("--rtt-range", nargs="+", help="RTT range", type=int, dest="rtt_range",
+                       default=[5, 10, 25, 50, 75, 100, 150, 250])
+        p.add_argument("--bw-range", nargs="+", help="Bandwidth range", type=int, dest="bw_range",
+                       default=[10, 20, 50, 100, 250, 500, 750, 1000])
+        p.add_argument("--size-range", nargs="+", help="Buffer size range", type=float, dest="size_range",
+                       default=[0.1, 1, 10, 20, 50])
         parsers[command] = p
 
     # command specific ones
@@ -59,9 +65,9 @@ def main():
     assert is_root(), f"{sys.argv[0]} has to be run with sudo"
 
     # need to run all the configs
-    for rtt in [5, 10, 25, 50, 75, 100, 150, 250]:
-        for bw in [10, 20, 50, 100, 250, 500, 750, 1000]:
-            for size in [0.1, 1, 10, 20, 50]:
+    for rtt in args.rtt_range:
+        for bw in args.bw_range:
+            for size in args.size_range:
                 # need to create a command
                 commands = base_commands + get_run_command(args, rtt, bw, size) + extra_args
                 # call subprocess to run it
