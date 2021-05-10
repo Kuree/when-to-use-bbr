@@ -34,12 +34,11 @@ def get_all_metrics(dirname):
     return result
 
 
-ExperimentConfig = collections.namedtuple("ExperimentConfig", ["hostname", "buffer_size", "rtt", "bw", "loss"])
+config_param_names = ["hostname", "buffer_size", "rtt", "bw", "loss"]
+ExperimentConfig = collections.namedtuple("ExperimentConfig", config_param_names)
 
 
 def parse_name_config(name):
-    # just in case it has json extension
-    name = os.path.splitext(name)[0]
     tokens = name.split("-")
     hostname = tokens[0]
     buffer_token = tokens[1]
