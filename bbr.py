@@ -69,7 +69,8 @@ def get_filename(node: typing.Union[mininet.node.Node, str], configs):
     buffer_size = configs.size
     rtt = configs.rtt
     bw = configs.bw
-    return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}.json")
+    loss = configs.loss
+    return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}-l{loss}.json")
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
