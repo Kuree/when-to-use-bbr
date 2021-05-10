@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from util import get_all_metrics, parse_name_config, config_param_names
 
-commands = ["heatmap"]
+commands = ["heatmap", "line"]
 
 
 def get_configs():
@@ -15,12 +15,17 @@ def get_configs():
         p = subparsers.add_parser(command)
         p.add_argument("-o", "--out", dest="out", help="Output file", required=True)
         p.add_argument("-i", "--input", nargs="+", dest="input", help="Input directory", required=True)
+        p.add_argument("-x", help="X axis param name", required=True, dest="x")
+        p.add_argument("-y", help="Y axis param name", required=True, dest="y")
 
         if command == "heatmap":
-            p.add_argument("-x", help="X axis param name", required=True, dest="x")
-            p.add_argument("-y", help="Y axis param name", required=True, dest="y")
             p.add_argument("-t", "--target", choices=["goodput", "rtt", "retransmits"], required=True,
                            help="Target measurement", dest="target")
+        if command == "line":
+            p.add_argument("-n", "--names", nargs="+", help="Legend names. Has to match with inputs", required=True,
+                           dest="names")
+            p.add_argument("--add-total", action="store_true", help="Whether to include total legend.",
+                           dest="add_total")
 
     return parser.parse_args()
 
@@ -44,21 +49,27 @@ def get_heatmap_dataframe(mat, x_values, y_values, names):
     return pd.DataFrame(result, columns=names)
 
 
-def preprocess_heatmap_data(configs, stats):
-    # based on the names, figure out which two variables to use
-    params = [(parse_name_config(name), name) for name in stats]
+def get_param_values(params, target_params: set):
     param_values = {}
     for param, name in params:
         for param_name in config_param_names:
             if param_name not in param_values:
                 param_values[param_name] = set()
             param_values[param_name].add(getattr(param, param_name))
+
     # make sure the x and y is correct
     for param_name in config_param_names:
-        if param_name in {configs.x, configs.y}:
+        if param_name in target_params:
             assert len(param_values[param_name]) > 1
         else:
             assert len(param_values[param_name]) == 1
+    return param_values
+
+
+def preprocess_heatmap_data(configs, stats):
+    # based on the names, figure out which two variables to use
+    params = [(parse_name_config(name), name) for name in stats]
+    param_values = get_param_values(params, {configs.x, configs.y})
 
     # compute value matrix
     x_values = list(param_values[configs.x])
@@ -129,11 +140,84 @@ def plot_heatmap(configs):
     fig.savefig(configs.out)
 
 
+def preprocess_line_data(configs, stats):
+    # based on the names, figure out which two variables to use
+    params = [(parse_name_config(name), name) for name in stats]
+    param_values = get_param_values(params, {configs.x})
+
+    x_values = list(param_values[configs.x])
+    x_values.sort()
+
+    mat = np.zeros(shape=len(x_values), dtype=np.float64)
+    for x, x_value in enumerate(x_values):
+        # find the value
+        met = None
+        for param, name in params:
+            if getattr(param, configs.x) == x_value:
+                # found it
+                met = stats[name]
+        assert met is not None, "Unable to construct matrix"
+        if configs.y == "goodput":
+            mat[x] = met[0]
+        elif configs.y == "rtt":
+            mat[x] = met[1]
+        elif configs.y == "retransmits":
+            mat[x] = met[2]
+    return mat, x_values, params
+
+
+def get_line_dataframe(configs, data, x_values, names):
+    result = []
+    for y in range(len(x_values)):
+        for i in range(len(names)):
+            row = [x_values[y], names[i], data[i][y]]
+            result.append(row)
+    df = pd.DataFrame(result, columns=[configs.x, "name", configs.y])
+    return df
+
+
+def plot_line(configs):
+    assert len(configs.names) == len(configs.input)
+    raw_stats = []
+    for dirname in configs.input:
+        raw_stats.append(get_all_metrics(dirname))
+    # check the stats data
+    for stat in raw_stats:
+        assert len(stat) == len(raw_stats[0])
+        for name in raw_stats[0]:
+            assert name in stat
+    data = []
+    x_values = None
+    for stat in raw_stats:
+        v, x_values, _ = preprocess_line_data(configs, stat)
+        data.append(v)
+
+    df = get_line_dataframe(configs, data, x_values, configs.names)
+    # scale axis
+    if configs.x == "loss":
+        df["loss"] *= 100
+    if configs.y == "goodput":
+        # convert bps to Mbps
+        df["goodput"] /= 1e6
+    ax = seaborn.lineplot(data=df, x=configs.x, y=configs.y)
+
+    if configs.x == "loss":
+        ax.set_xlabel("Loss Percentage (%)")
+    if configs.y == "goodput":
+        ax.set_ylabel("Goodput (Mbps)")
+
+    ax.set_ylim(ymin=0)
+    fig = ax.get_figure()
+    fig.savefig(configs.out)
+
+
 def main():
     matplotlib.use('Agg')
     configs = get_configs()
     if configs.command == "heatmap":
         plot_heatmap(configs)
+    elif configs.command == "line":
+        plot_line(configs)
 
 
 if __name__ == "__main__":
