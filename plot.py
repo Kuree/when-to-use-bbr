@@ -30,6 +30,11 @@ def compute_gain(mat1, mat2):
     return np.divide(np.subtract(mat1, mat2), mat2)
 
 
+def compute_dec(mat1, mat2):
+    # in this case mat1 is bbr and mat2 is cubic
+    return np.divide(np.subtract(mat2, mat1), mat2)
+
+
 def get_heatmap_dataframe(mat, x_values, y_values, names):
     result = []
     for y in range(len(y_values)):
@@ -39,18 +44,9 @@ def get_heatmap_dataframe(mat, x_values, y_values, names):
     return pd.DataFrame(result, columns=names)
 
 
-def plot_heatmap(configs):
-    assert len(configs.input) == 2
-    # load stats from two directories
-    stats1 = get_all_metrics(configs.input[0])
-    stats2 = get_all_metrics(configs.input[1])
-    # make sure we have the same stuff
-    assert len(stats1) > 0
-    assert len(stats1) == len(stats2)
-    for name in stats1:
-        assert name in stats2
+def preprocess_heatmap_data(configs, stats):
     # based on the names, figure out which two variables to use
-    params = [(parse_name_config(name), name) for name in stats1]
+    params = [(parse_name_config(name), name) for name in stats]
     param_values = {}
     for param, name in params:
         for param_name in config_param_names:
@@ -69,34 +65,58 @@ def plot_heatmap(configs):
     y_values = list(param_values[configs.y])
     x_values.sort()
     y_values.sort()
-    mat1 = np.zeros(shape=(len(y_values), len(x_values)), dtype=np.float64)
-    mat2 = np.zeros(shape=(len(y_values), len(x_values)), dtype=np.float64)
-
+    mat = np.zeros(shape=(len(y_values), len(x_values)), dtype=np.float64)
     for y, y_value in enumerate(y_values):
         for x, x_value in enumerate(x_values):
             # find the value
-            met1 = None
-            met2 = None
+            met = None
             for param, name in params:
                 if getattr(param, configs.x) == x_value and getattr(param, configs.y) == y_value:
                     # found it
-                    met1 = stats1[name]
-                    met2 = stats2[name]
-            assert met1 is not None, "Unable to construct matrix"
+                    met = stats[name]
+            assert met is not None, "Unable to construct matrix"
             if configs.target == "goodput":
-                mat1[y][x] = met1[0]
-                mat2[y][x] = met2[0]
+                mat[y][x] = met[0]
             elif configs.target == "rtt":
-                mat1[y][x] = met1[1]
-                mat2[y][x] = met2[1]
+                mat[y][x] = met[1]
             elif configs.target == "retransmits":
-                mat1[y][x] = met1[2]
-                mat2[y][x] = met2[2]
+                mat[y][x] = met[2]
+    return mat, x_values, y_values, params
 
-    gain = compute_gain(mat1 + mat1, mat2)
+
+def plot_heatmap(configs):
+    # based on the number of inputs and target
+    # load stats from two directories
+    if configs.target == "retransmits":
+        assert len(configs.input) == 1
+        stats1 = get_all_metrics(configs.input[0])
+        stats2 = None
+    else:
+        assert len(configs.input) == 2
+        stats1 = get_all_metrics(configs.input[0])
+        stats2 = get_all_metrics(configs.input[1])
+    # make sure we have the same stuff
+    assert len(stats1) > 0
+    if stats2 is not None:
+        assert len(stats1) == len(stats2)
+        for name in stats1:
+            assert name in stats2
+
+    mat1, x_values, y_values, params = preprocess_heatmap_data(configs, stats1)
+    if stats2 is not None:
+        mat2, _, __, ___ = preprocess_heatmap_data(configs, stats2)
+    else:
+        mat2 = None
+
+    if configs.target == "retransmits":
+        mat = mat1
+    elif configs.target == "rtt":
+        mat = compute_dec(mat1, mat2)
+    else:
+        mat = compute_gain(mat1, mat2)
     # prepare panda dataframe
 
-    df = get_heatmap_dataframe(gain, x_values, y_values, [configs.y, configs.x, "value"])
+    df = get_heatmap_dataframe(mat, x_values, y_values, [configs.y, configs.x, "value"])
     df = df.pivot(configs.y, configs.x, "value")
     ax = seaborn.heatmap(df)
     # set labels if necessary
