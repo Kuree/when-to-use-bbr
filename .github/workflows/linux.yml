@@ -9,7 +9,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Install Latest Mininet
+    - name: Install latest Mininet
       shell: bash
       run: |
         sudo apt update
@@ -22,13 +22,20 @@ jobs:
       shell: bash
       run: |
         sudo apt install -y iperf3
-    - name: Single host
+        sudo pip3 install -r requirements.txt
+    - name: Test single host
       shell: bash
       run: |
         sudo python3 bbr.py --debug -c cubic -t 2 # bbr is not available in the image
-    - name: Batch run script
+    - name: Test batch run script
       shell: bash
       run: |
-        sudo ./run mininet -t 1 --rtt-range 5 10 --bw-range 10 --size 0.1 1 --cc1 cubic -o batch
+        sudo ./run mininet -t 1 --rtt-range 5 10 --bw-range 10 20 --size 0.1 --cc1 cubic -o batch
         # use the utility script to ensure we have proper data
         python3 util.py batch
+    - name: Test plot script
+      shell: bash
+      run: |
+        python3 plot.py heatmap -i batch/ batch/ -x rtt -y bw -t goodput -o test.png
+        # make sure we generate the test.png properly
+        find . -name test.png | grep .
