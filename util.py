@@ -64,6 +64,7 @@ def __main():
             print(f"Goodput: {goodput} Mean RTT: {mean_rtt} Retr: {retransmits}")
         else:
             data = get_all_metrics(sys.argv[1])
+            assert len(data) > 0, f"{sys.argv[1]} empty!"
             for name, metric in data.items():
                 config = parse_name_config(name)
                 goodput, mean_rtt, retransmits = metric
