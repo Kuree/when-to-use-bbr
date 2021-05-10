@@ -25,6 +25,8 @@ def parse_args():
                        default=[10, 20, 50, 100, 250, 500, 750, 1000])
         p.add_argument("--size-range", nargs="+", help="Buffer size range", type=float, dest="size_range",
                        default=[0.1, 1, 10, 20, 50])
+        p.add_argument("--loss-range", nargs="+", help="Loss range", type=float, dest="loss_range",
+                       default=[0])
         parsers[command] = p
 
     # command specific ones
@@ -48,9 +50,9 @@ def get_base_commands():
     return [python, bbr]
 
 
-def get_run_command(configs, rtt, bw, size):
+def get_run_command(configs, rtt, bw, size, loss):
     commands = ["-t", configs.time, "--rtt", str(rtt), "--bw", bw, "-s", size,
-                "-o", configs.out, "-c", configs.cc1]
+                "-o", configs.out, "-c", configs.cc1, "-l", loss]
     if configs.command != "mininet":
         # need to set remote host as well
         commands += ["--remote-host", configs.host]
@@ -76,10 +78,11 @@ def main():
     for rtt in args.rtt_range:
         for bw in args.bw_range:
             for size in args.size_range:
-                # need to create a command
-                commands = base_commands + get_run_command(args, rtt, bw, size) + extra_args
-                # call subprocess to run it
-                subprocess.check_call(commands)
+                for loss in args.loss_range:
+                    # need to create a command
+                    commands = base_commands + get_run_command(args, rtt, bw, size, loss) + extra_args
+                    # call subprocess to run it
+                    subprocess.check_call(commands, stderr=sys.stderr)
 
 
 if __name__ == "__main__":
