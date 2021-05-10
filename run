@@ -17,6 +17,8 @@ def parse_args():
         p.add_argument("-o", "--out", default="out", help="Output folder", type=str, dest="out")
         p.add_argument("-t", "--time", default=60, help="Test duration", type=int, dest="time")
         p.add_argument("--debug", action="store_true", help="Add debug actions", dest="debug")
+        p.add_argument("-c", "--cc1", default="bbr", help="Congestion control for h1", choices=["bbr", "cubic"],
+                       type=str, dest="cc1")
         p.add_argument("--rtt-range", nargs="+", help="RTT range", type=int, dest="rtt_range",
                        default=[5, 10, 25, 50, 75, 100, 150, 250])
         p.add_argument("--bw-range", nargs="+", help="Bandwidth range", type=int, dest="bw_range",
@@ -29,6 +31,10 @@ def parse_args():
     for command in {"lan", "wan", "shared"}:
         p = parsers[command]
         p.add_argument("-H", "--host", help="Remote host name", type=str, dest="host", required=True)
+
+        if command == "shared":
+            p.add_argument("--cc2", help="Congestion control for host2", choices=["bbr", "cubic"], dest="cc2", type=str,
+                           required=True)
 
     return parser.parse_known_args()
 
@@ -44,12 +50,14 @@ def get_base_commands():
 
 def get_run_command(configs, rtt, bw, size):
     commands = ["-t", configs.time, "--rtt", str(rtt), "--bw", bw, "-s", size,
-                "-o", configs.out]
+                "-o", configs.out, "-c", configs.cc1]
     if configs.command != "mininet":
         # need to set remote host as well
         commands += ["--remote-host", configs.host]
     if configs.debug:
         commands += ["--debug"]
+    if configs.command == "shared":
+        commands += ["--h2", "--h2-cc", configs.cc2]
     commands = [str(c) for c in commands]
     return commands
 
