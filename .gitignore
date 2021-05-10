@@ -138,5 +138,5 @@ dmypy.json
 cython_debug/
 
 # log files
-*.iperf
+*.json
 out/
