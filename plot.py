@@ -168,9 +168,17 @@ def preprocess_line_data(configs, stats):
 
 def get_line_dataframe(configs, data, x_values, names):
     result = []
+    data = np.array(data)
     for y in range(len(x_values)):
         for i in range(len(names)):
             row = [x_values[y], names[i], data[i][y]]
+            result.append(row)
+
+    # whether we have total or not
+    if configs.add_total:
+        # need to add extra entries for Total
+        for y in range(len(x_values)):
+            row = [x_values[y], "Total", np.sum(data[:, y])]
             result.append(row)
     df = pd.DataFrame(result, columns=[configs.x, "name", configs.y])
     return df
@@ -199,12 +207,15 @@ def plot_line(configs):
     if configs.y == "goodput":
         # convert bps to Mbps
         df["goodput"] /= 1e6
-    ax = seaborn.lineplot(data=df, x=configs.x, y=configs.y)
+    ax = seaborn.lineplot(data=df, x=configs.x, y=configs.y, hue="name", style="name")
 
     if configs.x == "loss":
         ax.set_xlabel("Loss Percentage (%)")
     if configs.y == "goodput":
         ax.set_ylabel("Goodput (Mbps)")
+
+    # remove the label title so it's consistent with the paper
+    ax.get_legend().set_title(None)
 
     ax.set_ylim(ymin=0)
     fig = ax.get_figure()
