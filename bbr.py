@@ -45,7 +45,7 @@ class Topology(mininet.topo.Topo):
             return ["h1"]
 
 
-def setup_iperf_server(node, port1, port2=None):
+def setup_iperf_server(node, port1, port2):
     # iperf3 only allow one test per server
     cmd1 = f"iperf3 -s -p {port1} -4"
     cmd2 = f"iperf3 -s -p {port2} -4"
@@ -105,12 +105,15 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     return processes
 
 
-def cleanup(processes):
+def cleanup(net: mininet.net.Mininet, processes):
     h3_proc, h1_proc, h2_proc = processes
     for p in {h1_proc, h2_proc}:
         if p is not None:
             p.join()
     h3_proc.kill()
+    h3 = net.get("h3")
+    # killall iperf3 instances
+    h3.cmd("killall iperf3")
     mininet.clean.cleanup()
 
 
@@ -144,7 +147,7 @@ def run(configs):
 
     processes = setup_nodes(net, configs)
     # clean up at the end
-    cleanup(processes)
+    cleanup(net, processes)
     # check if we got everything
     check_output(topology, configs)
 
