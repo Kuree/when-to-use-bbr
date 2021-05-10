@@ -136,8 +136,7 @@ def plot_heatmap(configs):
     if configs.y == "bw":
         ax.set_ylabel("Bandwidth (Mbps)")
 
-    fig = ax.get_figure()
-    fig.savefig(configs.out)
+    return ax
 
 
 def preprocess_line_data(configs, stats):
@@ -218,17 +217,21 @@ def plot_line(configs):
     ax.get_legend().set_title(None)
 
     ax.set_ylim(ymin=0)
-    fig = ax.get_figure()
-    fig.savefig(configs.out)
+    return ax
 
 
 def main():
     matplotlib.use('Agg')
     configs = get_configs()
     if configs.command == "heatmap":
-        plot_heatmap(configs)
+        ax = plot_heatmap(configs)
     elif configs.command == "line":
-        plot_line(configs)
+        ax = plot_line(configs)
+    else:
+        ax = None
+    # save figure
+    fig = ax.get_figure()
+    fig.savefig(configs.out)
 
 
 if __name__ == "__main__":
