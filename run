@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import os
+import sys
+
+__commands = ["mininet", "lan", "wan", "shared"]
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(description="Experiment run script", dest="command", required=True)
+    parsers = {}
+    for command in __commands:
+        p = subparsers.add_parser(command)
+        p.add_argument("-o", "--out", default="out", help="Output folder", type=str, dest="out")
+        p.add_argument("-t", "--time", default=60, help="Test duration", type=int, dest="time")
+        p.add_argument("--debug", action="store_true", help="Add debug actions", dest="debug")
+        parsers[command] = p
+
+    # command specific ones
+    for command in {"lan", "wan", "shared"}:
+        p = parsers[command]
+        p.add_argument("-H", "--host", help="Remote host name", type=str, dest="host", required=True)
+
+    return parser.parse_known_args()
+
+
+def get_base_commands():
+    python = sys.executable
+    # make sure bbr.py exists
+    dirname = os.path.dirname(os.path.abspath(__file__))
+    bbr = os.path.join(dirname, "bbr.py")
+    assert os.path.exists(bbr)
+    return [python, bbr]
+
+
+def get_run_command(configs, rtt, bw, size):
+    commands = ["-t", configs.time, "--rtt", str(rtt), "--bw", bw, "-s", size,
+                "-o", configs.out]
+    if configs.command != "mininet":
+        # need to set remote host as well
+        commands += ["--remote-host", configs.host]
+    if configs.debug:
+        commands += ["--debug"]
+    commands = [str(c) for c in commands]
+    return commands
+
+
+def is_root():
+    return os.geteuid() == 0
+
+
+def main():
+    args, extra_args = parse_args()
+    base_commands = get_base_commands()
+
+    assert is_root(), f"{sys.argv[0]} has to be run with sudo"
+
+    # need to run all the configs
+    for rtt in [5, 10, 25, 50, 75, 100, 150, 250]:
+        for bw in [10, 20, 50, 100, 250, 500, 750, 1000]:
+            for size in [0.1, 1, 10, 20, 50]:
+                # need to create a command
+                commands = base_commands + get_run_command(args, rtt, bw, size) + extra_args
+                # call subprocess to run it
+                subprocess.check_call(commands)
+
+
+if __name__ == "__main__":
+    main()
