@@ -11,7 +11,6 @@ import mininet.clean
 import os
 import multiprocessing
 import sys
-import typing
 import subprocess
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
@@ -31,13 +30,13 @@ class Topology(mininet.topo.Topo):
                           port=self.config.remote_host_port)
         s1 = self.addSwitch("s1")
         # add link
-        self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay)
+        self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=self.config.loss)
 
         if self.config.h2:
             h2 = self.addHost("h2")
-            self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay)
+            self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
 
     def get_senders(self):
         if self.config.h2:
@@ -46,21 +45,34 @@ class Topology(mininet.topo.Topo):
             return ["h1"]
 
 
-def setup_iperf_server(node, port1, port2):
+def setup_iperf_server(node, port1, port2, configs):
     # iperf3 only allow one test per server
-    cmd1 = f"iperf3 -s -p {port1} -4"
-    cmd2 = f"iperf3 -s -p {port2} -4"
+    cmd1 = f"sudo iperf3 -s -p {port1} -4"
+    cmd2 = f"sudo iperf3 -s -p {port2} -4"
     # prevent blocking
-    node.popen(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if configs.debug:
+        print(node.name + ":", cmd1)
+        node.popen(cmd1, stdout=sys.stdout, stderr=sys.stderr)
+    else:
+        node.popen(cmd1, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if port2 is not None:
-        node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if configs.debug:
+            print(node.name + ":", cmd2)
+            node.popen(cmd2, stdout=sys.stdout, stderr=sys.stderr)
+        else:
+            node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
-                 total_time: float, port: int, cc: str, out: str):
+                 total_time: float, port: int, cc: str, out: str, debug: bool):
     target_ip = node_to.IP()
     # we output json file
-    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -t {total_time} -i 0 -J --logfile {out} -4"
+    # mtu 1500
+    # no delay
+    # window 16Mb
+    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -t {total_time} --window 16M  -N -M 1500 -i 0 -J --logfile {out} -4"
+    if debug:
+        print(node_from.name + ":", cmd)
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
 
@@ -76,13 +88,13 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     for filename in {h1_result, h2_result}:
         if os.path.exists(filename):
             os.remove(filename)
-    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2))
+    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
     h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port1, configs.cc,
-                                                                 h1_result))
+                                                                 h1_result, configs.debug))
     if configs.h2:
         h2 = net.get("h2")
         h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port2, configs.h2_cc,
-                                                                     h2_result))
+                                                                     h2_result, configs.debug))
     else:
         h2_proc = None
 
