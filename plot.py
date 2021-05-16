@@ -68,7 +68,7 @@ def get_param_values(params, target_params: set):
 
 def preprocess_heatmap_data(configs, stats):
     # based on the names, figure out which two variables to use
-    params = [(parse_name_config(name), name) for name in stats]
+    params = [(parse_name_config(name), name) for name in stats if "h1" in name]
     param_values = get_param_values(params, {configs.x, configs.y})
 
     # compute value matrix
@@ -122,14 +122,15 @@ def plot_heatmap(configs):
     if configs.target == "retransmits":
         mat = mat1
     elif configs.target == "rtt":
-        mat = compute_dec(mat1, mat2)
+        mat = compute_dec(mat1, mat2) * 100
     else:
-        mat = compute_gain(mat1, mat2)
+        assert configs.target == "goodput"
+        mat = compute_gain(mat1, mat2) * 100
     # prepare panda dataframe
 
     df = get_heatmap_dataframe(mat, x_values, y_values, [configs.y, configs.x, "value"])
-    df = df.pivot(configs.y, configs.x, "value")
-    ax = seaborn.heatmap(df)
+    df = df.pivot(configs.x, configs.y, "value")
+    ax = seaborn.heatmap(df, annot=True, fmt=".1f")
     # set labels if necessary
     if configs.x == "rtt":
         ax.set_xlabel("RTT (ms)")

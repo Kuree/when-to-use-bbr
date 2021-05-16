@@ -5,6 +5,8 @@ import subprocess
 import os
 import sys
 
+from util import get_filename
+
 __commands = ["mininet", "lan", "wan", "shared"]
 
 
@@ -20,13 +22,14 @@ def parse_args():
         p.add_argument("-c", "--cc1", default="bbr", help="Congestion control for h1", choices=["bbr", "cubic"],
                        type=str, dest="cc1")
         p.add_argument("--rtt-range", nargs="+", help="RTT range", type=int, dest="rtt_range",
-                       default=[5, 10, 25, 50, 75, 100, 150, 250])
+                       default=[5, 10, 25, 50, 75, 100, 150, 200])
         p.add_argument("--bw-range", nargs="+", help="Bandwidth range", type=int, dest="bw_range",
                        default=[10, 20, 50, 100, 250, 500, 750, 1000])
         p.add_argument("--size-range", nargs="+", help="Buffer size range", type=float, dest="size_range",
                        default=[0.1, 1, 10, 20, 50])
         p.add_argument("--loss-range", nargs="+", help="Loss range", type=float, dest="loss_range",
                        default=[0])
+        p.add_argument("--skip", action="store_true", dest="skip", help="If set, skip existing files")
         parsers[command] = p
 
     # command specific ones
@@ -68,6 +71,14 @@ def is_root():
     return os.geteuid() == 0
 
 
+class DotDict:
+    def __init__(self, dict_):
+        self.__dict = dict_
+
+    def __getattr__(self, item):
+        return self.__dict[item]
+
+
 def main():
     args, extra_args = parse_args()
     base_commands = get_base_commands()
@@ -83,6 +94,12 @@ def main():
         for bw in args.bw_range:
             for size in args.size_range:
                 for loss in args.loss_range:
+                    if args.skip:
+                        filename = get_filename("h1", DotDict({"rtt": rtt, "bw": bw, "size": size, "loss": loss,
+                                                               "output": args.out}))
+                        if os.path.exists(filename):
+                            print("Skipping", filename)
+                            continue
                     # need to create a command
                     commands = base_commands + get_run_command(args, rtt, bw, size, loss) + extra_args
                     # call subprocess to run it

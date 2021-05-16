@@ -56,6 +56,15 @@ def parse_name_config(name):
     return ExperimentConfig(hostname=hostname, buffer_size=buffer_size, rtt=rtt, bw=bw, loss=loss)
 
 
+def get_filename(node, configs):
+    name = node if isinstance(node, str) else node.name
+    buffer_size = configs.size
+    rtt = configs.rtt
+    bw = configs.bw
+    loss = configs.loss
+    return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}-l{loss}.json")
+
+
 def __main():
     if len(sys.argv) == 2:
         if sys.argv[1].endswith(".json"):

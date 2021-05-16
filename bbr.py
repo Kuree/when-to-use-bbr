@@ -15,7 +15,7 @@ import typing
 import subprocess
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
-from util import get_iperf_metrics
+from util import get_iperf_metrics, get_filename
 
 
 class Topology(mininet.topo.Topo):
@@ -62,15 +62,6 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     # we output json file
     cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -t {total_time} -i 0 -J --logfile {out} -4"
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
-
-
-def get_filename(node: typing.Union[mininet.node.Node, str], configs):
-    name = node if isinstance(node, str) else node.name
-    buffer_size = configs.size
-    rtt = configs.rtt
-    bw = configs.bw
-    loss = configs.loss
-    return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}-l{loss}.json")
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
