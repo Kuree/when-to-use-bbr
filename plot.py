@@ -122,15 +122,16 @@ def plot_heatmap(configs):
     if configs.target == "retransmits":
         mat = mat1
     elif configs.target == "rtt":
-        mat = compute_dec(mat1, mat2) * 100
+        mat = np.array(compute_dec(mat1, mat2) * 100, dtype=int)
     else:
         assert configs.target == "goodput"
-        mat = compute_gain(mat1, mat2) * 100
+        mat = np.array(compute_gain(mat1, mat2) * 100, dtype=int)
     # prepare panda dataframe
 
     df = get_heatmap_dataframe(mat, x_values, y_values, [configs.y, configs.x, "value"])
     df = df.pivot(configs.x, configs.y, "value")
-    ax = seaborn.heatmap(df, annot=True, fmt=".1f")
+    ax = seaborn.heatmap(df, annot=True, fmt="d", cmap=seaborn.cm.rocket_r)
+    ax.invert_yaxis()
     # set labels if necessary
     if configs.x == "rtt":
         ax.set_xlabel("RTT (ms)")
