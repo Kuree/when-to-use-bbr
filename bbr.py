@@ -25,9 +25,10 @@ class Topology(mininet.topo.Topo):
         super(Topology, self).__init__()
 
     def build(self):
-        h1 = self.addHost("h1")
+        # we don't use namespace since it removes the kernel count for tcp transmission
+        h1 = self.addHost("h1", inNamespace=False)
         h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user,
-                          port=self.config.remote_host_port)
+                          port=self.config.remote_host_port, inNamespace=False)
         s1 = self.addSwitch("s1")
         # add link
         self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
@@ -35,7 +36,7 @@ class Topology(mininet.topo.Topo):
                      loss=self.config.loss)
 
         if self.config.h2:
-            h2 = self.addHost("h2")
+            h2 = self.addHost("h2", inNamespace=False)
             self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
 
     def get_senders(self):
@@ -47,8 +48,8 @@ class Topology(mininet.topo.Topo):
 
 def setup_iperf_server(node, port1, port2, configs):
     # iperf3 only allow one test per server
-    cmd1 = f"sudo iperf3 -s -p {port1} -4"
-    cmd2 = f"sudo iperf3 -s -p {port2} -4"
+    cmd1 = f"iperf3 -s -p {port1} -4"
+    cmd2 = f"iperf3 -s -p {port2} -4"
     # prevent blocking
     if configs.debug:
         print(node.name + ":", cmd1)
