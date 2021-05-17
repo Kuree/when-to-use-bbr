@@ -120,7 +120,7 @@ def plot_heatmap(configs):
         mat2 = None
 
     if configs.target == "retransmits":
-        mat = mat1
+        mat = np.array(mat1, dtype=int)
     elif configs.target == "rtt":
         mat = np.array(compute_dec(mat1, mat2) * 100, dtype=int)
     else:
