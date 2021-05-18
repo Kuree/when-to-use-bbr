@@ -28,12 +28,12 @@ class Topology(mininet.topo.Topo):
         # we don't use namespace since it removes the kernel count for tcp transmission
         h1 = self.addHost("h1", inNamespace=False)
         h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user,
-                          port=self.config.remote_host_port, inNamespace=False)
+                          port=self.config.remote_host_port, inNamespace=True)
         s1 = self.addSwitch("s1")
         # add link
         self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
-                     loss=self.config.loss)
+                     loss=self.config.loss, max_queue_size=int(self.config.size * 1000))
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)

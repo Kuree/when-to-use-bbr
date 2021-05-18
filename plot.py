@@ -130,7 +130,7 @@ def plot_heatmap(configs):
 
     df = get_heatmap_dataframe(mat, x_values, y_values, [configs.y, configs.x, "value"])
     df = df.pivot(configs.x, configs.y, "value")
-    ax = seaborn.heatmap(df, annot=True, fmt="d", cmap=seaborn.cm.rocket_r)
+    ax = seaborn.heatmap(df, annot=configs.target != "retransmits", fmt="d", cmap=seaborn.cm.rocket_r)
     ax.invert_yaxis()
     # set labels if necessary
     if configs.x == "rtt":
