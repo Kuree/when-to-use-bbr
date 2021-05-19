@@ -58,7 +58,7 @@ def parse_name_config(name):
 
 def get_filename(node, configs):
     name = node if isinstance(node, str) else node.name
-    buffer_size = configs.size
+    buffer_size = configs.buffer_size
     rtt = configs.rtt
     bw = configs.bw
     loss = configs.loss

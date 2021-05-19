@@ -30,14 +30,15 @@ class Topology(mininet.topo.Topo):
         h3 = self.addHost("h3", server=self.config.remote_host, user=self.config.remote_user,
                           port=self.config.remote_host_port, inNamespace=True)
         s1 = self.addSwitch("s1")
-        # add link
-        self.addLink(h1, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
+        # [3.1] Host links have 1Gbps peak BW.
+        self.addLink(h1, s1, bw=1000, delay=self._min_delay)
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
-                     loss=self.config.loss, max_queue_size=int(self.config.size * 1000))
+                     loss=self.config.loss,
+                     max_queue_size=self.config.buffer_size * 1500)
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
-            self.addLink(h2, s1, bw=self.config.bw, delay=self._min_delay, max_queue_size=int(self.config.size * 1000))
+            self.addLink(h2, s1, bw=1000, delay=self._min_delay)
 
     def get_senders(self):
         if self.config.h2:
@@ -48,8 +49,8 @@ class Topology(mininet.topo.Topo):
 
 def setup_iperf_server(node, port1, port2, configs):
     # iperf3 only allow one test per server
-    cmd1 = f"iperf3 -s -p {port1} -4"
-    cmd2 = f"iperf3 -s -p {port2} -4"
+    cmd1 = f"iperf3 -s -p {port1} -4 -w 16m"
+    cmd2 = f"iperf3 -s -p {port2} -4 -w 16m"
     # prevent blocking
     if configs.debug:
         print(node.name + ":", cmd1)
@@ -165,7 +166,9 @@ def main():
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
     parser.add_argument("-s", "--size", "--buffer-size", choices=[0.1, 1, 10, 20, 50], default=0.1,
-                        help="Switch buffer size", type=float, dest="size")
+                        help="Switch buffer size", type=float,
+                        dest="buffer_size")
+    # TODO(liwenbo): should the default be "" instead?
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
                         help="remote host name/IP address")
     parser.add_argument("--remote-host-port", default=22, type=int, dest="remote_host_port",
