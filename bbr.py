@@ -12,10 +12,12 @@ import os
 import multiprocessing
 import sys
 import subprocess
+import math
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
 from util import get_iperf_metrics, get_filename
 
+# MTU - 40 bytes of TCP header size
 PACKET_SIZE = 1500 - 40
 
 
@@ -43,7 +45,7 @@ class Topology(mininet.topo.Topo):
         # to do a conversion
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=self.config.loss,
-                     max_queue_size=int(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE))
+                     max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)))
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
@@ -86,6 +88,8 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, confi
         args += [f"-n {configs.total_size}M"]
     else:
         args += [f"-t {configs.time}"]
+    # ignore the slow start, which is approximately 1s
+    args += ["-O 1"]
     cmd = " ".join(args)
     if configs.debug:
         print(node_from.name + ":", cmd)
