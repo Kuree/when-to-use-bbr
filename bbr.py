@@ -34,7 +34,9 @@ class Topology(mininet.topo.Topo):
         self.addLink(h1, s1, bw=1000, delay=self._min_delay)
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=self.config.loss,
-                     max_queue_size=self.config.buffer_size * 1500)
+                     # keyi: we don't need to multiply it by MTU since the size refers to the actual number
+                     # of bytes
+                     max_queue_size=int(self.config.buffer_size * 1000))
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
@@ -49,8 +51,8 @@ class Topology(mininet.topo.Topo):
 
 def setup_iperf_server(node, port1, port2, configs):
     # iperf3 only allow one test per server
-    cmd1 = f"iperf3 -s -p {port1} -4 -w 16m"
-    cmd2 = f"iperf3 -s -p {port2} -4 -w 16m"
+    cmd1 = f"iperf3 -s -p {port1} -4"
+    cmd2 = f"iperf3 -s -p {port2} -4"
     # prevent blocking
     if configs.debug:
         print(node.name + ":", cmd1)
@@ -168,7 +170,6 @@ def main():
     parser.add_argument("-s", "--size", "--buffer-size", choices=[0.1, 1, 10, 20, 50], default=0.1,
                         help="Switch buffer size", type=float,
                         dest="buffer_size")
-    # TODO(liwenbo): should the default be "" instead?
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
                         help="remote host name/IP address")
     parser.add_argument("--remote-host-port", default=22, type=int, dest="remote_host_port",
