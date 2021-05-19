@@ -67,15 +67,20 @@ def setup_iperf_server(node, port1, port2, configs):
             node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
-                 total_time: float, port: int, cc: str, out: str, debug: bool):
+def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, configs, port, filename):
     target_ip = node_to.IP()
     # we output json file
     # mtu 1500
     # no delay
     # window 16Mb
-    cmd = f"iperf3 -c {target_ip} -C {cc} -p {port} -t {total_time} --window 16M  -N -M 1500 -i 0 -J --logfile {out} -4"
-    if debug:
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", "-p", f"{port}",
+            "--window 16M  -N -M 1500 -i 0 -J -4", "--logfile", f"{filename}"]
+    if configs.total_size > 0:
+        args += ["-n", f"{configs.total_size}M"]
+    else:
+        args += ["-t", f"{configs.time}"]
+    cmd = " ".join(args)
+    if configs.debug:
         print(node_from.name + ":", cmd)
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
@@ -93,12 +98,10 @@ def setup_nodes(net: mininet.net.Mininet, configs):
         if os.path.exists(filename):
             os.remove(filename)
     h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs.time, tcp_port1, configs.cc,
-                                                                 h1_result, configs.debug))
+    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs, tcp_port1, h1_result))
     if configs.h2:
         h2 = net.get("h2")
-        h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs.time, tcp_port2, configs.h2_cc,
-                                                                     h2_result, configs.debug))
+        h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs, tcp_port2, h2_result))
     else:
         h2_proc = None
 
@@ -178,6 +181,8 @@ def main():
                         help="remote host user name")
     parser.add_argument("-t", "--time", default=60, type=int, help="How long should the experiment run",
                         dest="time")
+    parser.add_argument("--total-size", default=0, type=int, help="Total number of bytes to send (in MB). Cannot be "
+                                                                  "used together with time", dest="total_size")
     parser.add_argument("--debug", action="store_true", dest="debug")
     parser.add_argument("-o", "--output", type=str, dest="output", help="Output directory for the experiment",
                         default="out")
