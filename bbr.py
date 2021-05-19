@@ -16,6 +16,8 @@ import subprocess
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
 from util import get_iperf_metrics, get_filename
 
+PACKET_SIZE = 1500 - 40
+
 
 class Topology(mininet.topo.Topo):
     def __init__(self, config):
@@ -32,11 +34,16 @@ class Topology(mininet.topo.Topo):
         s1 = self.addSwitch("s1")
         # [3.1] Host links have 1Gbps peak BW.
         self.addLink(h1, s1, bw=1000, delay=self._min_delay)
+        # keyi: need to convert to number of bytes, then divided by the MTU to obtain number of packets
+        # mininet does the following parameter passing to tc:
+        # 'limit %d' % max_queue_size if max_queue_size is not None
+        # which produces the following command (e.g.)
+        # tc qdisc add dev s1-eth2  parent 5:1  handle 10: netem delay 75.0ms limit XX
+        # based on man tc-netem, limit is specified by the number of packets, hence we need
+        # to do a conversion
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=self.config.loss,
-                     # keyi: we don't need to multiply it by MTU since the size refers to the actual number
-                     # of bytes
-                     max_queue_size=int(self.config.buffer_size * 1000))
+                     max_queue_size=int(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE))
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
@@ -73,12 +80,12 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, confi
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", "-p", f"{port}",
-            "--window 16M  -N -M 1500 -i 0 -J -4", "--logfile", f"{filename}"]
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
+            "--window 16M -N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
     if configs.total_size > 0:
-        args += ["-n", f"{configs.total_size}M"]
+        args += [f"-n {configs.total_size}M"]
     else:
-        args += ["-t", f"{configs.time}"]
+        args += [f"-t {configs.time}"]
     cmd = " ".join(args)
     if configs.debug:
         print(node_from.name + ":", cmd)
