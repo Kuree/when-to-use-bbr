@@ -11,6 +11,9 @@ def get_iperf_metrics(filename):
         data = json.load(f)
     # we only need to end
     end = data["end"]
+    if "sum_sent" not in end:
+        print(f"Unable to find final stats for {filename}!", file=sys.stderr)
+        return 0, 0, 0
     sum_sent = end["sum_sent"]
     retransmits = sum_sent["retransmits"]
     sum_received = end["sum_received"]

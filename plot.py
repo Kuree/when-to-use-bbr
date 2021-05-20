@@ -214,6 +214,8 @@ def plot_line(configs):
         ax.set_xlabel("Loss Percentage (%)")
     if configs.y == "goodput":
         ax.set_ylabel("Goodput (Mbps)")
+    if configs.y == "retransmits":
+        ax.set_ylabel("Retr Number")
 
     # remove the label title so it's consistent with the paper
     ax.get_legend().set_title(None)

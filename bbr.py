@@ -181,7 +181,7 @@ def run(configs):
 
 def main():
     parser = argparse.ArgumentParser("BBR experiments")
-    parser.add_argument("-c", "--congestion-control", choices=["bbr", "cubic"], default="bbr",
+    parser.add_argument("-c", "--congestion-control", choices=["bbr", "cubic", "reno"], default="bbr",
                         help="h1 congestion control algorithm type", type=str, dest="cc")
     parser.add_argument("--rtt", choices=[5, 10, 25, 50, 75, 100, 150, 200], default=5,
                         help="RTT for the bottle net link", type=int, dest="rtt")

@@ -19,7 +19,7 @@ def parse_args():
         p.add_argument("-o", "--out", default="out", help="Output folder", type=str, dest="out")
         p.add_argument("-t", "--time", default=60, help="Test duration", type=int, dest="time")
         p.add_argument("--debug", action="store_true", help="Add debug actions", dest="debug")
-        p.add_argument("-c", "--cc1", default="bbr", help="Congestion control for h1", choices=["bbr", "cubic"],
+        p.add_argument("-c", "--cc1", default="bbr", help="Congestion control for h1", choices=["bbr", "cubic", "reno"],
                        type=str, dest="cc1")
         p.add_argument("--rtt-range", nargs="+", help="RTT range", type=int, dest="rtt_range",
                        default=[5, 10, 25, 50, 75, 100, 150, 200])
@@ -38,8 +38,8 @@ def parse_args():
         p.add_argument("-H", "--host", help="Remote host name", type=str, dest="host", required=True)
 
         if command == "shared":
-            p.add_argument("--cc2", help="Congestion control for host2", choices=["bbr", "cubic"], dest="cc2", type=str,
-                           required=True)
+            p.add_argument("--cc2", help="Congestion control for host2", choices=["bbr", "cubic", "reno"], dest="cc2",
+                           type=str, required=True)
 
     return parser.parse_known_args()
 
@@ -95,7 +95,7 @@ def main():
             for size in args.size_range:
                 for loss in args.loss_range:
                     if args.skip:
-                        filename = get_filename("h1", DotDict({"rtt": rtt, "bw": bw, "size": size, "loss": loss,
+                        filename = get_filename("h1", DotDict({"rtt": rtt, "bw": bw, "buffer_size": size, "loss": loss,
                                                                "output": args.out}))
                         if os.path.exists(filename):
                             print("Skipping", filename)
