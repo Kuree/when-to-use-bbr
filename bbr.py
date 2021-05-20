@@ -8,6 +8,7 @@ import mininet.link
 import mininet.net
 import mininet.util
 import mininet.clean
+import mininet.log
 import os
 import multiprocessing
 import sys
@@ -44,7 +45,7 @@ class Topology(mininet.topo.Topo):
         # based on man tc-netem, limit is specified by the number of packets, hence we need
         # to do a conversion
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
-                     loss=self.config.loss,
+                     loss=(self.config.loss * 100) if self.config.loss > 0 else None,
                      max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)))
 
         if self.config.h2:
@@ -154,6 +155,8 @@ def run(configs):
         os.makedirs(configs.output, exist_ok=True)
 
     topology = Topology(configs)
+    if configs.mininet_debug:
+        mininet.log.setLogLevel("debug")
     if configs.remote_host != "localhost":
         net = mininet.net.Mininet(topology, host=RemoteHost, link=RemoteSSHLink, switch=RemoteOVSSwitch,
                                   waitConnected=True)
@@ -167,6 +170,9 @@ def run(configs):
         net.pingAll()
 
     processes = setup_nodes(net, configs)
+    if configs.mininet_debug:
+        mininet.log.setLogLevel("error")
+
     # clean up at the end
     cleanup(net, processes)
     # check if we got everything
@@ -202,6 +208,8 @@ def main():
     parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
     parser.add_argument("--h2-cc", default="bbr", choices=["bbr", "cubic"],
                         help="h1 congestion control algorithm type", type=str, dest="h2_cc")
+    # for mininet debug
+    parser.add_argument("--mininet-debug", action="store_true", dest="mininet_debug")
     args = parser.parse_args()
 
     # run the experiments
