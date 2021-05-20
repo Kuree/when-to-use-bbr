@@ -16,7 +16,7 @@ import subprocess
 import math
 
 from remote import RemoteHost, RemoteSSHLink, RemoteOVSSwitch
-from util import get_iperf_metrics, get_filename
+from util import get_iperf_metrics, get_filename, get_available_cc
 
 # MTU - 40 bytes of TCP header size
 PACKET_SIZE = 1500 - 40
@@ -181,7 +181,8 @@ def run(configs):
 
 def main():
     parser = argparse.ArgumentParser("BBR experiments")
-    parser.add_argument("-c", "--congestion-control", choices=["bbr", "cubic", "reno"], default="bbr",
+    ccs = get_available_cc()
+    parser.add_argument("-c", "--congestion-control", choices=ccs, default="bbr",
                         help="h1 congestion control algorithm type", type=str, dest="cc")
     parser.add_argument("--rtt", choices=[5, 10, 25, 50, 75, 100, 150, 200], default=5,
                         help="RTT for the bottle net link", type=int, dest="rtt")
@@ -206,7 +207,7 @@ def main():
     parser.add_argument("-l", "--loss", type=float, default=0, dest="loss", help="Link loss rate")
     # whether to add h2
     parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
-    parser.add_argument("--h2-cc", default="bbr", choices=["bbr", "cubic"],
+    parser.add_argument("--h2-cc", default="bbr", choices=ccs,
                         help="h1 congestion control algorithm type", type=str, dest="h2_cc")
     # for mininet debug
     parser.add_argument("--mininet-debug", action="store_true", dest="mininet_debug")

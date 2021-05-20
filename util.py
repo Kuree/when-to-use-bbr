@@ -68,6 +68,12 @@ def get_filename(node, configs):
     return os.path.join(configs.output, f"{name}-b{buffer_size}-rtt{rtt}-bw{bw}-l{loss}.json")
 
 
+def get_available_cc():
+    with open("/proc/sys/net/ipv4/tcp_available_congestion_control") as f:
+        values = f.read()
+    return values.split()
+
+
 def __main():
     if len(sys.argv) == 2:
         if sys.argv[1].endswith(".json"):

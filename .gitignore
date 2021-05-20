@@ -145,3 +145,7 @@ cython_debug/
 out/
 *.pdf
 *.png
+
+# tcp bbr module files
+tcp_bbr_11_10
+tcp_bbr_3_2
