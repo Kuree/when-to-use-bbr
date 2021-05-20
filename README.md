@@ -48,3 +48,36 @@ tunnelling:
     ```
     sudo systemctl restart ssh.service
     ```
+
+
+## Figure generation
+In this section we will disucss how to obtain the experiments using Mininet locally.
+
+- Figure 7
+  To generate the graph for various lines, we need to run the Mininet simulation individually for
+  each congestion control algorithm. We also need to install BBR kernel modules with different pacing
+  gain. To do so, simply do
+  
+  ```
+  sudo python3 build_bbr.py -g 3 2 -o bbr_3_2 --install
+  ```
+  Gain is specified as a fraction, in this case `3/2`, using two integers. `--install` flag allows us
+  to install it into the kernel directly. We need to do this for BBR1.1 (`11 10`) and  BBR1.5 (`3 2`)
+  
+  After installing the kernel modules, we can run the experiment in a loop:
+
+  ```bash
+  for cc in bbr bbr_3_2 bbr_11_10 cubic reno;
+  do
+    sudo ./run mininet --rtt 25 --size 10 --bw 100 --loss-range 0 0.01 0.02 0.05 0.12 0.18 0.25 0.35 0.45 -o figure7/${cc}/ -c ${cc};
+  done
+  ```
+
+  Once the runs finish, we can then proceed to plot the graph. We can use the
+  following commands to obtain Figure 7a and Figure 7b.
+
+  ```bash
+    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" -x loss -y goodput -o figure7a.pdf
+
+    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" -x loss -y retransmits -o figure7b.pdf
+  ```
