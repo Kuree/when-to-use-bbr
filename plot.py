@@ -219,6 +219,7 @@ def plot_line(configs):
     ax.get_legend().set_title(None)
 
     ax.set_ylim(ymin=0)
+    ax.set_xlim(xmin=0)
     return ax
 
 
