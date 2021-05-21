@@ -53,7 +53,48 @@ tunnelling:
 ## Figure generation
 In this section we will disucss how to obtain the experiments using Mininet locally.
 
+- Figure 5
+
+  We need to generate two dataset with two different buffer size (`bs`).
+
+  ```bash
+  for bs in 0.1 10;
+  do
+    for cc in bbr cubic;
+    do
+      sudo ./run mininet -t 60 -c ${cc} --size-range ${bs} --loss-range 0 -o ${cc}_${bs}
+    done
+  done
+  ``` 
+
+  Then we can use `plot.py` to create desired heatmap:
+
+  - a:
+    
+    ```
+      python3 plot.py -i bbr_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a.pdf
+    ```
+
+  - b:
+
+    ```
+      python3 plot.py -i bbr_10 cubic_10 -x rtt -y bw -t goodput -o figure5b.pdf
+    ```
+
+  - c:
+     
+    ```
+      python3 plot.py -i bbr_0.1 -x rtt -y bw -t retransmits -o figure5c.pdf
+    ```
+
+  - d:
+     
+    ```
+      python3 plot.py -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
+    ```
+
 - Figure 7
+
   To generate the graph for various lines, we need to run the Mininet simulation individually for
   each congestion control algorithm. We also need to install BBR kernel modules with different pacing
   gain. To do so, simply do
