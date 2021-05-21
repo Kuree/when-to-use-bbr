@@ -19,6 +19,8 @@ def parse_args():
         p = subparsers.add_parser(command)
         p.add_argument("-o", "--out", default="out", help="Output folder", type=str, dest="out")
         p.add_argument("-t", "--time", default=60, help="Test duration", type=int, dest="time")
+        p.add_argument("--total-size", default=0, type=int, dest="total_size",
+                       help="Total number of bytes to send (in MB). Cannot be  used together with time")
         p.add_argument("--debug", action="store_true", help="Add debug actions", dest="debug")
         p.add_argument("-c", "--cc1", default="bbr", help="Congestion control for h1", choices=ccs,
                        type=str, dest="cc1")
@@ -55,7 +57,7 @@ def get_base_commands():
 
 
 def get_run_command(configs, rtt, bw, size, loss):
-    commands = ["-t", configs.time, "--rtt", str(rtt), "--bw", bw, "-s", size,
+    commands = ["--rtt", str(rtt), "--bw", bw, "-s", size,
                 "-o", configs.out, "-c", configs.cc1, "-l", loss]
     if configs.command != "mininet":
         # need to set remote host as well
@@ -64,6 +66,10 @@ def get_run_command(configs, rtt, bw, size, loss):
         commands += ["--debug"]
     if configs.command == "shared":
         commands += ["--h2", "--h2-cc", configs.cc2]
+    if configs.total_size == 0:
+        commands += ["--total-size", configs.total_size]
+    else:
+        commands += ["-t", configs.time]
     commands = [str(c) for c in commands]
     return commands
 

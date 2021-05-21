@@ -65,7 +65,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
       sudo ./run mininet -t 60 -c ${cc} --size-range ${bs} --loss-range 0 -o ${cc}_${bs}
     done
   done
-  ``` 
+  ```
 
   Then we can use `plot.py` to create desired heatmap:
 
@@ -92,6 +92,27 @@ In this section we will disucss how to obtain the experiments using Mininet loca
     ```
       python3 plot.py -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
     ```
+
+- Figure 6
+
+  In this experiment, we need to use total flow size (100MB in this case) instead of total time.
+
+  ```bash
+  for bs in 0.1 10;
+  do
+    for cc in bbr cubic;
+    do
+      sudo ./run mininet --total-size 100 -c ${cc} --size-range ${bs} --loss-range 0 -o ${cc}_${bs}_100
+    done
+  done
+  ```
+
+  To plot the two figures, we can use the following commands:
+
+  ```bash
+  python3 plot.py -i bbr_0.1_100 cubic_0.1_100 -x rtt -y bw -t rtt -o figure6a.pdf
+  python3 plot.py -i bbr_10_100 cubic_10_100 -x rtt -y bw -t rtt -o figure6b.pdf
+  ```
 
 - Figure 7
 
