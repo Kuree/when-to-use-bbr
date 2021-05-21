@@ -72,25 +72,25 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   - a:
     
     ```
-      python3 plot.py -i bbr_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a.pdf
+      python3 plot.py heatmap -i bbr_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a.pdf
     ```
 
   - b:
 
     ```
-      python3 plot.py -i bbr_10 cubic_10 -x rtt -y bw -t goodput -o figure5b.pdf
+      python3 plot.py heatmap -i bbr_10 cubic_10 -x rtt -y bw -t goodput -o figure5b.pdf
     ```
 
   - c:
      
     ```
-      python3 plot.py -i bbr_0.1 -x rtt -y bw -t retransmits -o figure5c.pdf
+      python3 plot.py heatmap -i bbr_0.1 -x rtt -y bw -t retransmits -o figure5c.pdf
     ```
 
   - d:
      
     ```
-      python3 plot.py -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
+      python3 plot.py heatmap -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
     ```
 
 - Figure 6
@@ -110,8 +110,8 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   To plot the two figures, we can use the following commands:
 
   ```bash
-  python3 plot.py -i bbr_0.1_100 cubic_0.1_100 -x rtt -y bw -t rtt -o figure6a.pdf
-  python3 plot.py -i bbr_10_100 cubic_10_100 -x rtt -y bw -t rtt -o figure6b.pdf
+  python3 plot.py heatmap -i bbr_0.1_100 cubic_0.1_100 -x rtt -y bw -t rtt -o figure6a.pdf
+  python3 plot.py heatmap -i bbr_10_100 cubic_10_100 -x rtt -y bw -t rtt -o figure6b.pdf
   ```
 
 - Figure 7
