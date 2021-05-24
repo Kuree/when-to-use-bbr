@@ -28,6 +28,8 @@ def get_configs():
                            dest="names")
             p.add_argument("--add-total", action="store_true", help="Whether to include total legend.",
                            dest="add_total")
+            p.add_argument("--split-host", action="store_true",
+                           help="If set, use the host prefix to determine to inputs", dest="split_host")
 
     return parser.parse_args()
 
@@ -188,10 +190,15 @@ def get_line_dataframe(configs, data, x_values, names):
 
 
 def plot_line(configs):
-    assert len(configs.names) == len(configs.input)
     raw_stats = []
-    for dirname in configs.input:
-        raw_stats.append(get_all_metrics(dirname))
+    if not configs.split_host:
+        assert len(configs.names) == len(configs.input)
+        for dirname in configs.input:
+            raw_stats.append(get_all_metrics(dirname))
+    else:
+        assert len(configs.input) == 1
+        raw_stats = get_all_metrics(configs.input[0], True)
+        assert len(configs.names) == len(raw_stats)
     # check the stats data
     for stat in raw_stats:
         assert len(stat) == len(raw_stats[0])

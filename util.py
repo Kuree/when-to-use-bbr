@@ -26,15 +26,32 @@ def get_iperf_metrics(filename):
     return goodput, mean_rtt, retransmits
 
 
-def get_all_metrics(dirname):
+def get_all_metrics(dirname, split_host=False):
     json_files = [os.path.join(dirname, fn) for fn in os.listdir(dirname) if fn.endswith(".json")]
-    result = {}
-    for filename in json_files:
-        fn = os.path.basename(filename)
-        name = os.path.splitext(fn)[0]
-        metric = get_iperf_metrics(filename)
-        result[name] = metric
-    return result
+    if split_host:
+        result = {}
+        for filename in json_files:
+            fn = os.path.basename(filename)
+            name = os.path.splitext(fn)[0]
+            host = name.split("-")[0]
+            if host not in result:
+                result[host] = {}
+            metric = get_iperf_metrics(filename)
+            result[host][name] = metric
+        array_result = []
+        keys = list(result.keys())
+        keys.sort()
+        for host in keys:
+            array_result.append(result[host])
+        return array_result
+    else:
+        result = {}
+        for filename in json_files:
+            fn = os.path.basename(filename)
+            name = os.path.splitext(fn)[0]
+            metric = get_iperf_metrics(filename)
+            result[name] = metric
+        return result
 
 
 config_param_names = ["hostname", "buffer_size", "rtt", "bw", "loss"]
