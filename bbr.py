@@ -108,12 +108,12 @@ def setup_lan_iperf_server(port1, port2, configs):
     return processes
 
 
-def get_iperf3_client_cmd(target_ip, port, filename, configs):
+def get_iperf3_client_cmd(target_ip, port, filename, configs, cc):
     # we output json file
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
             "-N", "-M", f"{PACKET_SIZE}",  "-i", "0", "-J", "-4", "--logfile", f"{filename}"]
     if configs.total_size > 0:
         args += ["-n", f"{configs.total_size}M"]
@@ -126,13 +126,14 @@ def get_iperf3_client_cmd(target_ip, port, filename, configs):
     return args
 
 
-def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, configs, port, filename):
+def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
+                 configs, port, filename, cc):
     target_ip = node_to.IP()
     # we output json file
     # mtu 1500
     # no delay
     # window 16Mb
-    args = get_iperf3_client_cmd(target_ip, port, filename, configs)
+    args = get_iperf3_client_cmd(target_ip, port, filename, configs, cc)
     cmd = " ".join(args)
     if configs.debug:
         print(node_from.name + ":", cmd)
@@ -152,10 +153,12 @@ def setup_nodes(net: mininet.net.Mininet, configs):
         if os.path.exists(filename):
             os.remove(filename)
     h3_proc = multiprocessing.Process(target=setup_mininet_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs, tcp_port1, h1_result))
+    h1_proc = multiprocessing.Process(target=setup_client,
+                                      args=(h1, h3, configs, tcp_port1, h1_result, configs.cc))
     if configs.h2:
         h2 = net.get("h2")
-        h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs, tcp_port2, h2_result))
+        h2_proc = multiprocessing.Process(target=setup_client,
+                                          args=(h2, h3, configs, tcp_port2, h2_result, configs.h2_cc))
     else:
         h2_proc = None
 
@@ -180,8 +183,10 @@ def setup_lan(configs):
         if os.path.exists(filename):
             os.remove(filename)
 
-    h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1, h1_result, configs)
-    h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2, h2_result, configs)
+    h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1,
+                                        h1_result, configs, configs.cc)
+    h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2,
+                                        h2_result, configs, configs.h2_cc)
 
     # start the server
     processes = [setup_lan_iperf_server(tcp_port1, tcp_port2, configs)]
