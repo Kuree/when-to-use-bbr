@@ -18,7 +18,6 @@ def get_configs():
         p.add_argument("-x", help="X axis param name", required=True, dest="x")
         p.add_argument("-y", help="Y axis param name", required=True, dest="y")
         p.add_argument("--debug", action="store_true", dest="debug")
-        p.add_argument("--logx", action="store_true", dest="logx")
 
         if command == "heatmap":
             p.add_argument("-t", "--target", choices=["goodput", "rtt", "retransmits"], required=True,
@@ -30,6 +29,9 @@ def get_configs():
                            dest="add_total")
             p.add_argument("--split-host", action="store_true",
                            help="If set, use the host prefix to determine to inputs", dest="split_host")
+            p.add_argument("--logx", action="store_true", dest="logx", help="If set, x axis will be in log")
+            p.add_argument("--logx-scale", dest="logx_scale", type=int, default=1e6,
+                           help="Multiple X-axis when plotting with --logx")
 
     return parser.parse_args()
 
@@ -221,6 +223,8 @@ def plot_line(configs):
         if configs.debug:
             print(df["goodput"])
         df["goodput"] /= 1e6
+    if configs.logx:
+        df[configs.x] *= configs.logx_scale
     ax = seaborn.lineplot(data=df, x=configs.x, y=configs.y, hue="name", style="name")
 
     if configs.x == "loss":
@@ -237,7 +241,7 @@ def plot_line(configs):
 
     ax.set_ylim(ymin=0)
     if configs.logx:
-        ax.set_xlim(xmin=0.01)
+        ax.set_xlim(xmin=0.01 * configs.logx_scale)
     else:
         ax.set_xlim(xmin=0)
     return ax
