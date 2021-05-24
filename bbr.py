@@ -305,11 +305,11 @@ def main():
     ccs = get_available_cc()
     parser.add_argument("-c", "--congestion-control", choices=ccs, default="bbr",
                         help="h1 congestion control algorithm type", type=str, dest="cc")
-    parser.add_argument("--rtt", choices=[5, 10, 25, 50, 75, 100, 150, 200], default=5,
+    parser.add_argument("--rtt", choices=[5, 10, 20, 25, 50, 75, 100, 150, 200], default=5,
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
-    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.1, 1, 10, 20, 50], default=0.1,
+    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 1, 5, 10, 20, 50, 100], default=0.1,
                         help="Switch buffer size", type=float,
                         dest="buffer_size")
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
