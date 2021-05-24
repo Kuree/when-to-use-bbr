@@ -198,9 +198,11 @@ def setup_lan(configs):
     tc_cmd += ["rate", f"{configs.bw}Mbit"]
     if configs.loss > 0:
         tc_cmd += ["loss", f"{int(configs.loss * 100)}%"]
+    if configs.debug:
+        print("tc:", " ".join(tc_cmd))
     subprocess.check_call(tc_cmd)
     # sleep a little bit to make sure the server is running
-    time.sleep(0.5)
+    time.sleep(1)
 
     # run the clients
     if configs.debug:
@@ -208,7 +210,7 @@ def setup_lan(configs):
     p = subprocess.Popen(h1_commands, stderr=sys.stderr, stdout=sys.stdout)
     processes.append(p)
     if tcp_port2 is not None:
-        p = subprocess.Popen(h2_commands)
+        p = subprocess.Popen(h2_commands, stderr=sys.stderr, stdout=sys.stdout)
         processes.append(p)
     else:
         processes.append(None)
@@ -228,12 +230,14 @@ def cleanup_mininet(net: mininet.net.Mininet, processes):
     mininet.clean.cleanup()
 
 
-def clear_lan_iperf3():
-    cmd = "sudo tc qdisc del dev eth0 root netem".split()
-    subprocess.call(cmd, stderr=subprocess.DEVNULL)
+def clear_lan_iperf3(debug):
+    cmd = "sudo tc qdisc del dev eth0 root netem"
+    if debug:
+        print("tc:", cmd)
+    subprocess.call(cmd.split(), stderr=subprocess.DEVNULL)
 
 
-def cleanup_lan(processes):
+def cleanup_lan(processes, debug):
     h3_processes, h1_proc, h2_proc = processes
     for p in {h1_proc, h2_proc}:
         if p is not None:
@@ -245,7 +249,7 @@ def cleanup_lan(processes):
                     break
     for p in h3_processes:
         p.kill()
-    clear_lan_iperf3()
+    clear_lan_iperf3(debug)
 
 
 def check_output(configs):
@@ -268,9 +272,9 @@ def run(configs):
         mininet.log.setLogLevel("debug")
     if configs.remote_host != "localhost":
         # use bare-metal iperf3 and tc
-        clear_lan_iperf3()
+        clear_lan_iperf3(configs.debug)
         processes = setup_lan(configs)
-        cleanup_lan(processes)
+        cleanup_lan(processes, configs.debug)
     else:
         # clean up previous mininet runs in case of crashes
         mininet.clean.cleanup()
