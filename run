@@ -32,6 +32,7 @@ def parse_args():
                        default=[0.1, 1, 10, 20, 50])
         p.add_argument("--loss-range", nargs="+", help="Loss range", type=float, dest="loss_range",
                        default=[0])
+        p.add_argument("--remote-host", type=str, dest="remote_host", default="localhost", help="Remote host name")
         p.add_argument("--skip", action="store_true", dest="skip", help="If set, skip existing files")
         parsers[command] = p
 
@@ -70,6 +71,8 @@ def get_run_command(configs, rtt, bw, size, loss):
         commands += ["--total-size", configs.total_size]
     else:
         commands += ["-t", configs.time]
+    if configs.remote_host != "localhost":
+        commands += ["--remote-host", configs.remote_host]
     commands = [str(c) for c in commands]
     return commands
 

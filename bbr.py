@@ -84,13 +84,16 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, confi
     # no delay
     # window 16Mb
     args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
-            "--window 16M -N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
+            "-N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
     if configs.total_size > 0:
         args += [f"-n {configs.total_size}M"]
     else:
         args += [f"-t {configs.time}"]
     # ignore the slow start, which is approximately 1s
     args += ["-O 1"]
+    # if not remote host, ignore the window since iperf3 complains about it
+    if configs.remote_host == "localhost":
+        args += ["--window 16M"]
     cmd = " ".join(args)
     if configs.debug:
         print(node_from.name + ":", cmd)
