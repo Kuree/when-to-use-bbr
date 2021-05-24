@@ -136,7 +136,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     args = get_iperf3_client_cmd(target_ip, port, filename, configs, cc)
     cmd = " ".join(args)
     if configs.debug:
-        print(node_from.name + ":", cmd)
+        print(f"setup_client: {node_from.name}: {cmd}")
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
 
