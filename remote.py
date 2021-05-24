@@ -10,7 +10,7 @@ from operator import attrgetter
 from distutils.version import StrictVersion
 
 from mininet.node import Node, OVSSwitch
-from mininet.link import Link
+from mininet.link import Link, TCIntf
 from mininet.util import quietRun, decode
 from mininet.log import debug, info
 from mininet.clean import addCleanupCallback
@@ -287,6 +287,8 @@ class RemoteLink(Link):
         self.tunnel = None
         kwargs.setdefault('params1', {})
         kwargs.setdefault('params2', {})
+        kwargs.setdefault('cls1', TCIntf)
+        kwargs.setdefault('cls2', TCIntf)
         self.cmd = None  # satisfy pylint
         Link.__init__(self, node1, node2, **kwargs)
 
