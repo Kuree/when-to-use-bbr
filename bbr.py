@@ -44,9 +44,12 @@ class Topology(mininet.topo.Topo):
         # tc qdisc add dev s1-eth2  parent 5:1  handle 10: netem delay 75.0ms limit XX
         # based on man tc-netem, limit is specified by the number of packets, hence we need
         # to do a conversion
+        max_queue_size = int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE))
+        if config.debug:
+            print(f"max_queue_size: {max_queue_size}")
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=(self.config.loss * 100) if self.config.loss > 0 else None,
-                     max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)))
+                     max_queue_size=max_queue_size )
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
