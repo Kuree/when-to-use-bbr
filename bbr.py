@@ -22,6 +22,10 @@ from util import get_iperf_metrics, get_filename, get_available_cc
 PACKET_SIZE = 1500 - 40
 
 
+def get_queue_size(buffer_size):
+    return int(math.ceil(buffer_size * 1000 * 1000 / PACKET_SIZE))
+
+
 class Topology(mininet.topo.Topo):
     def __init__(self, config):
         self.config = config
@@ -46,7 +50,7 @@ class Topology(mininet.topo.Topo):
         # to do a conversion
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=(self.config.loss * 100) if self.config.loss > 0 else None,
-                     max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)))
+                     max_queue_size=get_queue_size(self.config.buffer_size))
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
@@ -59,10 +63,15 @@ class Topology(mininet.topo.Topo):
             return ["h1"]
 
 
-def setup_iperf_server(node, port1, port2, configs):
+def get_iperf3_server_commands(port1, port2):
     # iperf3 only allow one test per server
     cmd1 = f"iperf3 -s -p {port1} -4"
     cmd2 = f"iperf3 -s -p {port2} -4"
+    return cmd1, cmd2
+
+
+def setup_mininet_iperf_server(node, port1, port2, configs):
+    cmd1, cmd2 = get_iperf3_server_commands(port1, port2)
     # prevent blocking
     if configs.debug:
         print(node.name + ":", cmd1)
@@ -77,23 +86,53 @@ def setup_iperf_server(node, port1, port2, configs):
             node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def setup_lan_iperf_server(port1, port2, configs):
+    # killall the iperf3 server first
+    commands = ["ssh", f"mininet@{configs.remote_host}", "-p", f"{configs.remote_host_port}", "killall", "iperf3"]
+    subprocess.call(commands, stderr=subprocess.DEVNULL)
+
+    cmd1, cmd2 = get_iperf3_server_commands(port1, port2)
+
+    processes = []
+    commands = [cmd1, cmd2] if port2 is not None else [cmd1]
+    for cmd in commands:
+        if configs.debug:
+            # need to ssh to the host and run that command
+            commands = ["ssh", f"mininet@{configs.remote_host}", "-p", f"{configs.remote_host_port}"] + cmd.split()
+            print(configs.remote_host + ":", " ".join(commands))
+            p = subprocess.Popen(commands, stdout=sys.stdout, stderr=sys.stderr)
+        else:
+            p = subprocess.Popen(commands, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        processes.append(p)
+    return processes
+
+
+def get_iperf3_client_cmd(target_ip, port, filename, configs):
+    # we output json file
+    # mtu 1500
+    # no delay
+    # window 16Mb
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
+            "-N", "-M", f"{PACKET_SIZE}",  "-i", "0", "-J", "-4", "--logfile", f"{filename}"]
+    if configs.total_size > 0:
+        args += ["-n", f"{configs.total_size}M"]
+    else:
+        args += ["-t", f"{configs.time}"]
+    # ignore the slow start, which is approximately 1s
+    args += ["-O", "1"]
+    if configs.remote_host == "localhost":
+        args += ["--window", "16M"]
+    return args
+
+
 def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, configs, port, filename):
     target_ip = node_to.IP()
     # we output json file
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
-            "-N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
-    if configs.total_size > 0:
-        args += [f"-n {configs.total_size}M"]
-    else:
-        args += [f"-t {configs.time}"]
-    # ignore the slow start, which is approximately 1s
-    args += ["-O 1"]
-    # if not remote host, ignore the window since iperf3 complains about it
-    if configs.remote_host == "localhost":
-        args += ["--window 16M"]
+    args = get_iperf3_client_cmd(target_ip, port, filename, configs)
     cmd = " ".join(args)
     if configs.debug:
         print(node_from.name + ":", cmd)
@@ -112,7 +151,7 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     for filename in {h1_result, h2_result}:
         if os.path.exists(filename):
             os.remove(filename)
-    h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
+    h3_proc = multiprocessing.Process(target=setup_mininet_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
     h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs, tcp_port1, h1_result))
     if configs.h2:
         h2 = net.get("h2")
@@ -130,7 +169,52 @@ def setup_nodes(net: mininet.net.Mininet, configs):
     return processes
 
 
-def cleanup(net: mininet.net.Mininet, processes):
+def setup_lan(configs):
+    # we directly use iperf3 and tc, since mininet remote is not working properly
+    tcp_port1 = 9998
+    tcp_port2 = 9999 if configs.h2 else None
+    h1_result = get_filename("h1", configs)
+    h2_result = get_filename("h2", configs)
+    # need to remove this file if already exists
+    for filename in {h1_result, h2_result}:
+        if os.path.exists(filename):
+            os.remove(filename)
+
+    h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1, h1_result, configs)
+    h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2, h2_result, configs)
+
+    # start the server
+    processes = [setup_lan_iperf_server(tcp_port1, tcp_port2, configs)]
+
+    # set up tc command
+    tc_cmd = ["tc", "qdisc", "add", "dev", "eth0", "root", "netem"]
+    # add delay
+    tc_cmd += ["delay", f"{configs.rtt / 2}ms"]
+    # add buffer size
+    tc_cmd += ["limit", f"{get_queue_size(configs.buffer_size)}"]
+    # bandwidth
+    tc_cmd += ["rate", f"{configs.bw}Mbit"]
+    if configs.loss > 0:
+        tc_cmd += ["loss", f"{int(configs.loss * 100)}%"]
+    subprocess.check_call(tc_cmd)
+    # sleep a little bit to make sure the server is running
+    time.sleep(0.5)
+
+    # run the clients
+    if configs.debug:
+        print("h1", " ".join(h1_commands))
+    p = subprocess.Popen(h1_commands, stderr=sys.stderr, stdout=sys.stdout)
+    processes.append(p)
+    if tcp_port2 is not None:
+        p = subprocess.Popen(h2_commands)
+        processes.append(p)
+    else:
+        processes.append(None)
+
+    return processes
+
+
+def cleanup_mininet(net: mininet.net.Mininet, processes):
     h3_proc, h1_proc, h2_proc = processes
     for p in {h1_proc, h2_proc}:
         if p is not None:
@@ -142,44 +226,69 @@ def cleanup(net: mininet.net.Mininet, processes):
     mininet.clean.cleanup()
 
 
-def check_output(topology: Topology, configs):
+def clear_lan_iperf3():
+    cmd = "sudo tc qdisc del dev eth0 root netem".split()
+    subprocess.call(cmd, stderr=subprocess.DEVNULL)
+
+
+def cleanup_lan(processes):
+    h3_processes, h1_proc, h2_proc = processes
+    for p in {h1_proc, h2_proc}:
+        if p is not None:
+            while True:
+                poll = p.poll()
+                if poll is None:
+                    time.sleep(0.1)
+                else:
+                    break
+    for p in h3_processes:
+        p.kill()
+    clear_lan_iperf3()
+
+
+def check_output(configs):
     # check if we generate the outputs properly
-    nodes = topology.get_senders()
-    for node in nodes:
-        filename = get_filename(node, configs)
+    h1_result = get_filename("h1", configs)
+    h2_result = get_filename("h2", configs)
+    results = [h1_result]
+    if configs.h2:
+        results.append(h2_result)
+    for filename in results:
         get_iperf_metrics(filename)
 
 
 def run(configs):
-    # clean up previous mininet runs in case of crashes
-    mininet.clean.cleanup()
     # if output directory doesn't exist, create them
     if not os.path.exists(configs.output):
         os.makedirs(configs.output, exist_ok=True)
 
-    topology = Topology(configs)
     if configs.mininet_debug:
         mininet.log.setLogLevel("debug")
     if configs.remote_host != "localhost":
-        net = mininet.net.Mininet(topology, host=RemoteHost, link=RemoteSSHLink, switch=RemoteOVSSwitch,
-                                  waitConnected=True)
+        # use bare-metal iperf3 and tc
+        clear_lan_iperf3()
+        processes = setup_lan(configs)
+        cleanup_lan(processes)
     else:
+        # clean up previous mininet runs in case of crashes
+        mininet.clean.cleanup()
+        topology = Topology(configs)
         net = mininet.net.Mininet(topology, host=mininet.node.CPULimitedHost, link=mininet.link.TCLink)
-    net.start()
+        net.start()
 
-    if configs.debug:
-        # test out the component
-        mininet.util.dumpNetConnections(net)
-        net.pingAll()
+        if configs.debug:
+            # test out the component
+            mininet.util.dumpNetConnections(net)
+            net.pingAll()
 
-    processes = setup_nodes(net, configs)
-    if configs.mininet_debug:
-        mininet.log.setLogLevel("error")
+        processes = setup_nodes(net, configs)
+        if configs.mininet_debug:
+            mininet.log.setLogLevel("error")
 
-    # clean up at the end
-    cleanup(net, processes)
+        # clean up at the end
+        cleanup_mininet(net, processes)
     # check if we got everything
-    check_output(topology, configs)
+    check_output(configs)
 
 
 def main():
