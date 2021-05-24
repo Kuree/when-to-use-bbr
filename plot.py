@@ -18,6 +18,7 @@ def get_configs():
         p.add_argument("-x", help="X axis param name", required=True, dest="x")
         p.add_argument("-y", help="Y axis param name", required=True, dest="y")
         p.add_argument("--debug", action="store_true", dest="debug")
+        p.add_argument("--logx", action="store_true", dest="logx")
 
         if command == "heatmap":
             p.add_argument("-t", "--target", choices=["goodput", "rtt", "retransmits"], required=True,
@@ -221,12 +222,17 @@ def plot_line(configs):
         ax.set_ylabel("Goodput (Mbps)")
     if configs.y == "retransmits":
         ax.set_ylabel("Retr Number")
+    if configs.logx:
+        ax.set_xscale("log")
 
     # remove the label title so it's consistent with the paper
     ax.get_legend().set_title(None)
 
     ax.set_ylim(ymin=0)
-    ax.set_xlim(xmin=0)
+    if configs.logx:
+        ax.set_xlim(xmin=0.01)
+    else:
+        ax.set_xlim(xmin=0)
     return ax
 
 
