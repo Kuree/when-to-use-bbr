@@ -46,7 +46,8 @@ class Topology(mininet.topo.Topo):
         # to do a conversion
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=(self.config.loss * 100) if self.config.loss > 0 else None,
-                     max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)))
+                     max_queue_size=int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE)),
+                     use_tbf=True)
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
