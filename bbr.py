@@ -77,13 +77,14 @@ def setup_iperf_server(node, port1, port2, configs):
             node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, configs, port, filename):
+def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
+                 configs, port, filename, cc):
     target_ip = node_to.IP()
     # we output json file
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
             "-N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
     if configs.total_size > 0:
         args += [f"-n {configs.total_size}M"]
@@ -96,7 +97,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, confi
         args += ["--window 16M"]
     cmd = " ".join(args)
     if configs.debug:
-        print(node_from.name + ":", cmd)
+        print(f"setup_client: {node_from.name}: {cmd}")
     node_from.cmd(cmd, shell=True, stderr=sys.stderr)
 
 
@@ -113,10 +114,12 @@ def setup_nodes(net: mininet.net.Mininet, configs):
         if os.path.exists(filename):
             os.remove(filename)
     h3_proc = multiprocessing.Process(target=setup_iperf_server, args=(h3, tcp_port1, tcp_port2, configs))
-    h1_proc = multiprocessing.Process(target=setup_client, args=(h1, h3, configs, tcp_port1, h1_result))
+    h1_proc = multiprocessing.Process(target=setup_client,
+                                      args=(h1, h3, configs, tcp_port1, h1_result, configs.cc))
     if configs.h2:
         h2 = net.get("h2")
-        h2_proc = multiprocessing.Process(target=setup_client, args=(h2, h3, configs, tcp_port2, h2_result))
+        h2_proc = multiprocessing.Process(target=setup_client,
+                                          args=(h2, h3, configs, tcp_port2, h2_result, configs.h2_cc))
     else:
         h2_proc = None
 
@@ -187,12 +190,12 @@ def main():
     ccs = get_available_cc()
     parser.add_argument("-c", "--congestion-control", choices=ccs, default="bbr",
                         help="h1 congestion control algorithm type", type=str, dest="cc")
-    parser.add_argument("--rtt", choices=[5, 10, 25, 50, 75, 100, 150, 200], default=5,
+    parser.add_argument("--rtt", choices=[5, 10, 20, 25, 50, 75, 100, 150, 200], default=5,
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
-    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.1, 1, 10, 20, 50], default=0.1,
-                        help="Switch buffer size", type=float,
+    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 1, 5, 10, 20, 50, 100], default=0.1,
+                        help="Switch buffer size in MB", type=float,
                         dest="buffer_size")
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
                         help="remote host name/IP address")
