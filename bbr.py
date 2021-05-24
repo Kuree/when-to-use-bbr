@@ -45,7 +45,7 @@ class Topology(mininet.topo.Topo):
         # based on man tc-netem, limit is specified by the number of packets, hence we need
         # to do a conversion
         max_queue_size = int(math.ceil(self.config.buffer_size * 1000 * 1000 / PACKET_SIZE))
-        if config.debug:
+        if self.config.debug:
             print(f"max_queue_size: {max_queue_size}")
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=(self.config.loss * 100) if self.config.loss > 0 else None,
