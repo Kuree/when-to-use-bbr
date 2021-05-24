@@ -17,6 +17,7 @@ def get_configs():
         p.add_argument("-i", "--input", nargs="+", dest="input", help="Input directory", required=True)
         p.add_argument("-x", help="X axis param name", required=True, dest="x")
         p.add_argument("-y", help="Y axis param name", required=True, dest="y")
+        p.add_argument("--debug", action="store_true", dest="debug")
 
         if command == "heatmap":
             p.add_argument("-t", "--target", choices=["goodput", "rtt", "retransmits"], required=True,
@@ -209,6 +210,8 @@ def plot_line(configs):
         df["loss"] *= 100
     if configs.y == "goodput":
         # convert bps to Mbps
+        if configs.debug:
+            print(df["goodput"])
         df["goodput"] /= 1e6
     ax = seaborn.lineplot(data=df, x=configs.x, y=configs.y, hue="name", style="name")
 
