@@ -193,8 +193,10 @@ def plot_line(configs):
     # check the stats data
     for stat in raw_stats:
         assert len(stat) == len(raw_stats[0])
-        for name in raw_stats[0]:
-            assert name in stat
+        # FIXME(wen): The name could be different if lines are different in
+        # something other than cc algo.
+        #for name in raw_stats[0]:
+        #    assert name in stat
     data = []
     x_values = None
     for stat in raw_stats:
