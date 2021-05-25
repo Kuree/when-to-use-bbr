@@ -101,7 +101,7 @@ class RemoteMixin(object):
         self.splitInit = splitInit
         if self.user and self.server != 'localhost':
             self.dest = '%s@%s' % (self.user, self.serverIP)
-            self.sshcmd = ['sudo', '-E', '-u', self.user] + self.sshbase
+            self.sshcmd = ['sudo', '-E', '-u', "mininet"] + self.sshbase
             if port is not None:
                 self.sshcmd += ["-p", str(port)]
             if self.controlPath:

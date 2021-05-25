@@ -88,7 +88,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
+    args = ["sudo iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
             "-N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
     if configs.total_size > 0:
         args += [f"-n {configs.total_size}M"]
@@ -102,7 +102,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     cmd = " ".join(args)
     if configs.debug:
         print(f"setup_client: {node_from.name}: {cmd}")
-    node_from.cmd(cmd, shell=True, stderr=sys.stderr)
+    node_from.cmd(cmd, shell=True, stderr=sys.stderr, stdout=sys.stdout)
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
@@ -128,7 +128,7 @@ def setup_nodes(net: mininet.net.Mininet, configs):
         h2_proc = None
 
     h3_proc.start()
-    time.sleep(0.5)
+    time.sleep(2 if configs.h2 else 0.5)
     h1_proc.start()
     if configs.h2:
         h2_proc.start()
