@@ -198,7 +198,7 @@ def main():
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
-    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 1, 5, 10, 20, 50, 100], default=0.1,
+    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 0.5, 1, 5, 10, 20, 50, 100], default=0.1,
                         help="Switch buffer size in MB", type=float,
                         dest="buffer_size")
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
