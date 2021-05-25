@@ -78,7 +78,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
 
   - a:
     
-    ```python
+    ```bash
       python3 plot.py heatmap -i bbr_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a.pdf
       # PCC comparisons
       python3 plot.py heatmap -i pcc_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a_pcc.pdf
@@ -87,7 +87,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
 
   - b:
 
-    ```python
+    ```bash
       python3 plot.py heatmap -i bbr_10 cubic_10 -x rtt -y bw -t goodput -o figure5b.pdf
       # PCC comparisons
       python3 plot.py heatmap -i pcc_10 cubic_10 -x rtt -y bw -t goodput -o figure5b_pcc.pdf
@@ -96,7 +96,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
 
   - c:
      
-    ```python
+    ```bash
       python3 plot.py heatmap -i bbr_0.1 -x rtt -y bw -t retransmits -o figure5c.pdf
       # PCC comparisons
       python3 plot.py heatmap -i pcc_0.1 -x rtt -y bw -t retransmits -o figure5cd_pcc.pdf
@@ -104,7 +104,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
 
   - d:
      
-    ```python
+    ```bash
       python3 plot.py heatmap -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
     ```
 
