@@ -9,8 +9,8 @@ and evaluation study](https://www3.cs.stonybrook.edu/~arunab/papers/imc19_bbr.pd
 We use the VM recommended by the Mininet (Ubuntu 20.04.1 VM image). You can download the image
 [here](https://github.com/mininet/mininet/releases/tag/2.3.0).
 
-### Setting Mininet VM
-We need some packages that's not installed by default in the Mininet VM
+After you turn up the image, you'll need to download some packages that's not
+installed by default in the Mininet VM.
 
 #### BBR Kernel Module
 ```bash
@@ -21,6 +21,13 @@ sudo reboot
 # load the kernel module
 sudo modprobe tcp_bbr
 # check to see if BBR is available in the kernel
+cat /proc/sys/net/ipv4/tcp_available_congestion_control
+```
+
+#### PCC Kernel Module
+```bash
+./build_pcc.sh
+# check to see if PCC is available in the kernel
 cat /proc/sys/net/ipv4/tcp_available_congestion_control
 ```
 
@@ -60,7 +67,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   ```bash
   for bs in 0.1 10;
   do
-    for cc in bbr cubic;
+    for cc in bbr cubic pcc;
     do
       sudo ./run mininet -t 60 -c ${cc} --size-range ${bs} --loss-range 0 -o ${cc}_${bs}
     done
@@ -71,25 +78,33 @@ In this section we will disucss how to obtain the experiments using Mininet loca
 
   - a:
     
-    ```
+    ```python
       python3 plot.py heatmap -i bbr_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a.pdf
+      # PCC comparisons
+      python3 plot.py heatmap -i pcc_0.1 cubic_0.1 -x rtt -y bw -t goodput -o figure5a_pcc.pdf
+      python3 plot.py heatmap -i pcc_0.1 bbr_0.1 -x rtt -y bw -t goodput -o figure5a_pcc_bbr.pdf
     ```
 
   - b:
 
-    ```
+    ```python
       python3 plot.py heatmap -i bbr_10 cubic_10 -x rtt -y bw -t goodput -o figure5b.pdf
+      # PCC comparisons
+      python3 plot.py heatmap -i pcc_10 cubic_10 -x rtt -y bw -t goodput -o figure5b_pcc.pdf
+      python3 plot.py heatmap -i pcc_10 bbr_10 -x rtt -y bw -t goodput -o figure5b_pcc_bbr.pdf
     ```
 
   - c:
      
-    ```
+    ```python
       python3 plot.py heatmap -i bbr_0.1 -x rtt -y bw -t retransmits -o figure5c.pdf
+      # PCC comparisons
+      python3 plot.py heatmap -i pcc_0.1 -x rtt -y bw -t retransmits -o figure5cd_pcc.pdf
     ```
 
   - d:
      
-    ```
+    ```python
       python3 plot.py heatmap -i cubic_0.1 -x rtt -y bw -t retransmits -o figure5d.pdf
     ```
 
@@ -100,7 +115,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   ```bash
   for bs in 0.1 10;
   do
-    for cc in bbr cubic;
+    for cc in bbr cubic pcc;
     do
       sudo ./run mininet --total-size 100 -c ${cc} --size-range ${bs} --loss-range 0 -o ${cc}_${bs}_100
     done
@@ -112,6 +127,11 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   ```bash
   python3 plot.py heatmap -i bbr_0.1_100 cubic_0.1_100 -x rtt -y bw -t rtt -o figure6a.pdf
   python3 plot.py heatmap -i bbr_10_100 cubic_10_100 -x rtt -y bw -t rtt -o figure6b.pdf
+  # PCC comparisons
+  python3 plot.py heatmap -i pcc_0.1_100 cubic_0.1_100 -x rtt -y bw -t rtt -o figure6a_pcc.pdf
+  python3 plot.py heatmap -i pcc_10_100 cubic_10_100 -x rtt -y bw -t rtt -o figure6b_pcc.pdf
+  python3 plot.py heatmap -i pcc_0.1_100 bbr_0.1_100 -x rtt -y bw -t rtt -o figure6a_pcc_bbr.pdf
+  python3 plot.py heatmap -i pcc_10_100 bbr_10_100 -x rtt -y bw -t rtt -o figure6b_pcc_bbr.pdf
   ```
 
 - Figure 7
@@ -122,6 +142,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   
   ```
   sudo python3 build_bbr.py -g 3 2 -o bbr_3_2 --install
+  sudo python3 build_bbr.py -g 11 10 -o bbr_11_10 --install
   ```
   Gain is specified as a fraction, in this case `3/2`, using two integers. `--install` flag allows us
   to install it into the kernel directly. We need to do this for BBR1.1 (`11 10`) and  BBR1.5 (`3 2`)
@@ -129,7 +150,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   After installing the kernel modules, we can run the experiment in a loop:
 
   ```bash
-  for cc in bbr bbr_3_2 bbr_11_10 cubic reno;
+  for cc in bbr bbr_3_2 bbr_11_10 cubic reno pcc;
   do
     sudo ./run mininet --rtt 25 --size 10 --bw 100 --loss-range 0 0.01 0.02 0.05 0.12 0.18 0.25 0.35 0.45 -o figure7/${cc}/ -c ${cc};
   done
@@ -139,7 +160,7 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   following commands to obtain Figure 7a and Figure 7b.
 
   ```bash
-    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" -x loss -y goodput -o figure7a.pdf
+    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno figure7/pcc -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" "PCC" -x loss -y goodput -o figure7a.pdf
 
-    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" -x loss -y retransmits -o figure7b.pdf
+    python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno figure7/pcc -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" "PCC" -x loss -y retransmits -o figure7b.pdf
   ```
