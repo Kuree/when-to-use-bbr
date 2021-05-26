@@ -38,8 +38,9 @@ def parse_args():
     # command specific ones
     for command in {"lan", "wan", "shared"}:
         p = parsers[command]
-        p.add_argument("--remote-host", type=str, dest="remote_host", default="localhost", help="Remote host name")
+        p.add_argument("--remote-host", type=str, dest="remote_host", required=True, help="Remote host name")
         p.add_argument("--remote-user", type=str, dest="remote_user", default="mininet", help="Remote user name")
+        p.add_argument("--switch", type=str, dest="switch", required=True, "Switch host name")
 
         if command == "shared":
             p.add_argument("--cc2", help="Congestion control for host2", choices=ccs, dest="cc2",
@@ -64,6 +65,7 @@ def get_run_command(configs, rtt, bw, size, loss):
         # need to set remote host as well
         commands += ["--remote-host", configs.remote_host]
         commands += ["--remote-user", configs.remote_user]
+        commands += ["--switch", configs.switch]
     if configs.debug:
         commands += ["--debug"]
     if configs.command == "shared":
