@@ -94,7 +94,8 @@ def main():
     args, extra_args = parse_args()
     base_commands = get_base_commands()
 
-    assert is_root(), f"{sys.argv[0]} has to be run with sudo"
+    if args.command == "mininet":
+        assert is_root(), f"{sys.argv[0]} has to be run with sudo"
 
     # make sire the directory exists
     if not os.path.exists(args.out):
