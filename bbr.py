@@ -90,6 +90,13 @@ def setup_mininet_iperf_server(node, port1, port2, configs):
             node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def get_ssh_commands(host, commands, port=22, debug=False):
+    commands = ["ssh", f"mininet@{host}", "-p", f"{port}"] + commands
+    if debug:
+        print("SSH cmd:", " ".join(commands))
+    return commands
+
+
 def setup_lan_iperf_server(port1, port2, configs):
     # killall the iperf3 server first
     commands = ["ssh", f"mininet@{configs.remote_host}", "-p", f"{configs.remote_host_port}", "killall", "iperf3"]
@@ -100,9 +107,9 @@ def setup_lan_iperf_server(port1, port2, configs):
     processes = []
     commands = [cmd1, cmd2] if port2 is not None else [cmd1]
     for cmd in commands:
+        commands = get_ssh_commands(configs.remote_host, cmd.split(), configs.remote_host_port, )
         if configs.debug:
             # need to ssh to the host and run that command
-            commands = ["ssh", f"mininet@{configs.remote_host}", "-p", f"{configs.remote_host_port}"] + cmd.split()
             print(configs.remote_host + ":", " ".join(commands))
             p = subprocess.Popen(commands, stdout=sys.stdout, stderr=sys.stderr)
         else:
@@ -189,7 +196,7 @@ def setup_lan(configs):
 
     # set up tc command
     # we assume eth2 is the link that points to the host 3
-    tc_cmd = ["tc", "qdisc", "add", "dev", "eth2", "root", "netem"]
+    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth1", "root", "netem"]
     # add delay
     tc_cmd += ["delay", f"{configs.rtt / 2}ms"]
     # add buffer size
@@ -198,9 +205,9 @@ def setup_lan(configs):
     tc_cmd += ["rate", f"{configs.bw}Mbit"]
     if configs.loss > 0:
         tc_cmd += ["loss", f"{int(configs.loss * 100)}%"]
-    if configs.debug:
-        print("tc:", " ".join(tc_cmd))
-    subprocess.check_call(tc_cmd)
+    # need to ssh into the
+    switch_tc_commands = get_ssh_commands(configs.switch, commands=tc_cmd)
+    subprocess.check_call(switch_tc_commands)
     # sleep a little bit to make sure the server is running
     time.sleep(1)
 
@@ -230,14 +237,13 @@ def cleanup_mininet(net: mininet.net.Mininet, processes):
     mininet.clean.cleanup()
 
 
-def clear_lan_iperf3(debug):
-    cmd = "sudo tc qdisc del dev eth0 root netem"
-    if debug:
-        print("tc:", cmd)
-    subprocess.call(cmd.split(), stderr=subprocess.DEVNULL)
+def clear_lan_iperf3(configs):
+    cmd = "sudo tc qdisc del dev eth1 root netem"
+    switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
+    subprocess.call(switch_commands, stderr=subprocess.DEVNULL)
 
 
-def cleanup_lan(processes, debug):
+def cleanup_lan(processes, configs):
     h3_processes, h1_proc, h2_proc = processes
     for p in {h1_proc, h2_proc}:
         if p is not None:
@@ -249,7 +255,7 @@ def cleanup_lan(processes, debug):
                     break
     for p in h3_processes:
         p.kill()
-    clear_lan_iperf3(debug)
+    clear_lan_iperf3(configs)
 
 
 def check_output(configs):
@@ -272,9 +278,9 @@ def run(configs):
         mininet.log.setLogLevel("debug")
     if configs.remote_host != "localhost":
         # use bare-metal iperf3 and tc
-        clear_lan_iperf3(configs.debug)
+        clear_lan_iperf3(configs)
         processes = setup_lan(configs)
-        cleanup_lan(processes, configs.debug)
+        cleanup_lan(processes, configs)
     else:
         # clean up previous mininet runs in case of crashes
         mininet.clean.cleanup()
@@ -327,6 +333,8 @@ def main():
     parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
     parser.add_argument("--h2-cc", default="bbr", choices=ccs,
                         help="h1 congestion control algorithm type", type=str, dest="h2_cc")
+    parser.add_argument("--switch", default="localhost", dest="switch", help="Switch IP address. Only usefully for LAN"
+                        " and WAN", type=str)
     # for mininet debug
     parser.add_argument("--mininet-debug", action="store_true", dest="mininet_debug")
     args = parser.parse_args()
