@@ -32,14 +32,14 @@ def parse_args():
                        default=[0.1, 1, 10, 20, 50])
         p.add_argument("--loss-range", nargs="+", help="Loss range", type=float, dest="loss_range",
                        default=[0])
-        p.add_argument("--remote-host", type=str, dest="remote_host", default="localhost", help="Remote host name")
         p.add_argument("--skip", action="store_true", dest="skip", help="If set, skip existing files")
         parsers[command] = p
 
     # command specific ones
     for command in {"lan", "wan", "shared"}:
         p = parsers[command]
-        p.add_argument("-H", "--host", help="Remote host name", type=str, dest="host", required=True)
+        p.add_argument("--remote-host", type=str, dest="remote_host", default="localhost", help="Remote host name")
+        p.add_argument("--remote-user", type=str, dest="remote_user", default="mininet", help="Remote user name")
 
         if command == "shared":
             p.add_argument("--cc2", help="Congestion control for host2", choices=ccs, dest="cc2",
@@ -62,7 +62,8 @@ def get_run_command(configs, rtt, bw, size, loss):
                 "-o", configs.out, "-c", configs.cc1, "-l", loss]
     if configs.command != "mininet":
         # need to set remote host as well
-        commands += ["--remote-host", configs.host]
+        commands += ["--remote-host", configs.remote_host]
+        commands += ["--remote-user", configs.remote_user]
     if configs.debug:
         commands += ["--debug"]
     if configs.command == "shared":
@@ -71,8 +72,6 @@ def get_run_command(configs, rtt, bw, size, loss):
         commands += ["--total-size", configs.total_size]
     else:
         commands += ["-t", configs.time]
-    if configs.remote_host != "localhost":
-        commands += ["--remote-host", configs.remote_host]
     commands = [str(c) for c in commands]
     return commands
 

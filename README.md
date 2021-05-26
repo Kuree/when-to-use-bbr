@@ -16,8 +16,6 @@ installed by default in the Mininet VM.
 ```bash
 sudo apt update
 sudo apt install -y linux-generic-hwe-20.04
-# need to reboot the VM
-sudo reboot
 # load the kernel module
 sudo modprobe tcp_bbr
 # check to see if BBR is available in the kernel
@@ -47,7 +45,7 @@ networking option.
 In addition, the "remote host" needs to change its `sshd` default permission to allow SSH
 tunnelling:
 
-1. Add the following to `/etc/ssh/sshd_config
+1. Add the following to `/etc/ssh/sshd_config`
     ```
     PermitTunnel yes
     ```

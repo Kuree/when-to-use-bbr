@@ -49,7 +49,8 @@ class Topology(mininet.topo.Topo):
             print(f"max_queue_size: {max_queue_size}")
         self.addLink(s1, h3, bw=self.config.bw, delay="{0}ms".format(self.config.rtt / 2),
                      loss=(self.config.loss * 100) if self.config.loss > 0 else None,
-                     max_queue_size=max_queue_size )
+                     max_queue_size=max_queue_size,
+                     use_tbf=True)
 
         if self.config.h2:
             h2 = self.addHost("h2", inNamespace=False)
@@ -87,7 +88,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     # mtu 1500
     # no delay
     # window 16Mb
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
+    args = ["sudo iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
             "-N", f"-M {PACKET_SIZE}",  "-i 0 -J -4", f"--logfile {filename}"]
     if configs.total_size > 0:
         args += [f"-n {configs.total_size}M"]
@@ -101,7 +102,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node,
     cmd = " ".join(args)
     if configs.debug:
         print(f"setup_client: {node_from.name}: {cmd}")
-    node_from.cmd(cmd, shell=True, stderr=sys.stderr)
+    node_from.cmd(cmd, shell=True, stderr=sys.stderr, stdout=sys.stdout)
 
 
 def setup_nodes(net: mininet.net.Mininet, configs):
@@ -127,7 +128,7 @@ def setup_nodes(net: mininet.net.Mininet, configs):
         h2_proc = None
 
     h3_proc.start()
-    time.sleep(0.5)
+    time.sleep(2 if configs.h2 else 0.5)
     h1_proc.start()
     if configs.h2:
         h2_proc.start()
@@ -197,7 +198,7 @@ def main():
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
-    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 1, 5, 10, 20, 50, 100], default=0.1,
+    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 0.5, 1, 5, 10, 20, 50, 100], default=0.1,
                         help="Switch buffer size in MB", type=float,
                         dest="buffer_size")
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
