@@ -99,8 +99,9 @@ def get_ssh_commands(host, commands, port=22, debug=False):
 
 def setup_lan_iperf_server(port1, port2, configs):
     # killall the iperf3 server first
-    commands = ["ssh", f"mininet@{configs.remote_host}", "-p", f"{configs.remote_host_port}", "killall", "iperf3"]
-    subprocess.call(commands, stderr=subprocess.DEVNULL)
+    commands = get_ssh_commands(configs.remote_host, port=configs.remote_host_port, commands=["killall", "iperf3"],
+                                debug=configs.debug)
+    subprocess.call(commands, stderr=sys.stderr if configs.debug else subprocess.DEVNULL)
 
     cmd1, cmd2 = get_iperf3_server_commands(port1, port2)
 
@@ -195,7 +196,10 @@ def setup_lan(configs):
     processes = [setup_lan_iperf_server(tcp_port1, tcp_port2, configs)]
 
     # set up tc command
-    # we assume eth2 is the link that points to the host 3
+    # limit it to 1Gbps
+    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth0", "root", "netem", "rate", "1Gbit"]
+    subprocess.check_call(tc_cmd)
+    # we assume eth1 is the link that points to the host 3
     tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth1", "root", "netem"]
     # add delay
     tc_cmd += ["delay", f"{configs.rtt / 2}ms"]
@@ -238,6 +242,8 @@ def cleanup_mininet(net: mininet.net.Mininet, processes):
 
 
 def clear_lan_iperf3(configs):
+    cmd = "sudo tc qdisc del dev eth0 root netem"
+    subprocess.call(cmd.split(), stderr=subprocess.DEVNULL)
     cmd = "sudo tc qdisc del dev eth1 root netem"
     switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
     subprocess.call(switch_commands, stderr=subprocess.DEVNULL)

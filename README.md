@@ -228,7 +228,7 @@ Here we let the two interface of `switch` route to each other, and we will contr
 emulate the switch/router behavior. Notice that we also need to allow IP forwarding, which can be set via
 
 ```sh
-echo 1 > /proc/sys/net/ipv4/ip_forward
+echo 1 | sudo tee -a /proc/sys/net/ipv4/ip_forward
 ```
 
 After setting each host's network configuration, we need to pally changes to `netplan`:
