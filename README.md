@@ -163,6 +163,24 @@ In this section we will disucss how to obtain the experiments using Mininet loca
     python ./plot.py line -i figure7/bbr figure7/bbr_11_10 figure7/bbr_3_2/ figure7/cubic/ figure7/reno figure7/pcc -n "BBR" "BBR1.1" "BBR1.5" "Cubic" "Reno" "PCC" -x loss -y retransmits -o figure7b.pdf
   ```
 
+
+  - Figure 8
+   
+    Figure 8 is a little bit tricky to generate. It requires a LAN/WAN and we assume you already has it setup
+
+    LAN version:
+    
+    ```bash
+    ./run shared --rtt 20 --bw 1000 --loss-range 0 --size 0.01 0.02 0.04 0.08 0.1 0.5 1 5 10 --switch 10.10.10.1 --h2 10.10.10.4 --remote-host 10.10.1.2 --cc2 cubic -c bbr -o figure8/lan
+    ```
+
+    To plot, we can use the following command:
+    
+    ```bash
+    python3 plot.py line -i figure8/lan --split-host -n "BBR" "Cubic" -x buffer_size -y goodput -o figure8c.pdf --add-total --logx
+    ```
+
+
 ## Setting up VMs for LAN test
 
 Unfortunately we have observed abnormal throughput result using Mininet. To obtain proper result, we need a VM-based LAN setup.
@@ -228,7 +246,7 @@ Here we let the two interface of `switch` route to each other, and we will contr
 emulate the switch/router behavior. Notice that we also need to allow IP forwarding, which can be set via
 
 ```sh
-echo 1 | sudo tee -a /proc/sys/net/ipv4/ip_forward
+echo 1 > /proc/sys/net/ipv4/ip_forward
 ```
 
 After setting each host's network configuration, we need to pally changes to `netplan`:
@@ -236,3 +254,6 @@ After setting each host's network configuration, we need to pally changes to `ne
 ```sh
 sudo netplan apply
 ```
+
+After that, we can add additional commands to the run script to use our VM topology:
+

@@ -120,8 +120,8 @@ def setup_lan_iperf_server(port1, port2, configs):
     return processes
 
 
-def get_iperf3_client_cmd(target_ip, port, filename, configs):
-    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{configs.cc}", f"-p {port}",
+def get_iperf3_client_cmd(target_ip, port, filename, cc, configs):
+    args = ["iperf3", "-c", f"{target_ip}", "-C", f"{cc}", f"-p {port}",
             "-N", "-M", f"{PACKET_SIZE}",  "-i", "0", "-J", "-4", "--logfile", f"{filename}"]
     if configs.total_size > 0:
         args += ["-n", f"{configs.total_size}M"]
@@ -140,7 +140,7 @@ def setup_client(node_from: mininet.node.Node, node_to: mininet.node.Node, confi
     # mtu 1500
     # no delay
     # window 16Mb
-    args = get_iperf3_client_cmd(target_ip, port, filename, configs)
+    args = get_iperf3_client_cmd(target_ip, port, filename, configs.cc, configs)
     cmd = " ".join(args)
     if configs.debug:
         print(f"setup_client: {node_from.name}: {cmd}")
@@ -189,8 +189,8 @@ def setup_lan(configs):
         if os.path.exists(filename):
             os.remove(filename)
 
-    h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1, h1_result, configs)
-    h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2, h2_result, configs)
+    h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1, h1_result, configs.cc, configs)
+    h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2, h2_result, configs.h2_cc, configs)
 
     # start the server
     processes = [setup_lan_iperf_server(tcp_port1, tcp_port2, configs)]
@@ -199,6 +199,11 @@ def setup_lan(configs):
     # limit it to 1Gbps
     tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth0", "root", "netem", "rate", "1Gbit"]
     subprocess.check_call(tc_cmd)
+    # apply this to h2 as well, if enabled
+    if configs.h2:
+        tc_cmd = get_ssh_commands(configs.h2_host, tc_cmd, debug=configs.debug)
+        subprocess.check_call(tc_cmd)
+
     # we assume eth1 is the link that points to the host 3
     tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth1", "root", "netem"]
     # add delay
@@ -211,6 +216,8 @@ def setup_lan(configs):
         tc_cmd += ["loss", f"{int(configs.loss * 100)}%"]
     # need to ssh into the
     switch_tc_commands = get_ssh_commands(configs.switch, commands=tc_cmd)
+    if configs.debug:
+        print("switch:", " ".join(switch_tc_commands))
     subprocess.check_call(switch_tc_commands)
     # sleep a little bit to make sure the server is running
     time.sleep(1)
@@ -221,6 +228,8 @@ def setup_lan(configs):
     p = subprocess.Popen(h1_commands, stderr=sys.stderr, stdout=sys.stdout)
     processes.append(p)
     if tcp_port2 is not None:
+        if configs.debug:
+            print("h2", " ".join(h2_commands))
         p = subprocess.Popen(h2_commands, stderr=sys.stderr, stdout=sys.stdout)
         processes.append(p)
     else:
@@ -244,6 +253,9 @@ def cleanup_mininet(net: mininet.net.Mininet, processes):
 def clear_lan_iperf3(configs):
     cmd = "sudo tc qdisc del dev eth0 root netem"
     subprocess.call(cmd.split(), stderr=subprocess.DEVNULL)
+    if configs.h2:
+        cmd = get_ssh_commands(configs.h2_host, commands=cmd.split())
+        subprocess.call(cmd, stderr=subprocess.DEVNULL)
     cmd = "sudo tc qdisc del dev eth1 root netem"
     switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
     subprocess.call(switch_commands, stderr=subprocess.DEVNULL)
@@ -318,7 +330,7 @@ def main():
                         help="RTT for the bottle net link", type=int, dest="rtt")
     parser.add_argument("--bw", choices=[10, 20, 50, 100, 250, 500, 750, 1000], default=10,
                         help="Bandwidth for the bottleneck link", type=int, dest="bw")
-    parser.add_argument("-s", "--size", "--buffer-size", choices=[0.01, 0.1, 0.5, 1, 5, 10, 20, 50, 100], default=0.1,
+    parser.add_argument("-s", "--size", "--buffer-size", default=0.1,
                         help="Switch buffer size in MB", type=float,
                         dest="buffer_size")
     parser.add_argument("--remote-host", default="localhost", type=str, dest="remote_host",
@@ -339,6 +351,7 @@ def main():
     parser.add_argument("--h2", action="store_true", dest="h2", help="Whether to use h2 in the experiment")
     parser.add_argument("--h2-cc", default="bbr", choices=ccs,
                         help="h1 congestion control algorithm type", type=str, dest="h2_cc")
+    parser.add_argument("--h2-host", default="localhost", dest="h2_host", help="h2 hostname", type=str)
     parser.add_argument("--switch", default="localhost", dest="switch", help="Switch IP address. Only usefully for LAN"
                         " and WAN", type=str)
     # for mininet debug
