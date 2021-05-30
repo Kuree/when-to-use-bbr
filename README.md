@@ -164,28 +164,29 @@ In this section we will disucss how to obtain the experiments using Mininet loca
   ```
 
 
-  - Figure 8
+- Figure 8
    
-    Figure 8 is a little bit tricky to generate. It requires a LAN/WAN and we assume you already has it setup
+  Figure 8 is a little bit tricky to generate. It requires a LAN/WAN and we assume you already has it setup
 
-    LAN version:
+  LAN version:
     
-    ```bash
-    ./run shared --rtt 20 --bw 1000 --loss-range 0 --size 0.01 0.02 0.04 0.08 0.1 0.5 1 5 10 --switch 10.10.10.1 --h2 10.10.10.4 --remote-host 10.10.1.2 --cc2 cubic -c bbr -o figure8/lan
-    ```
+  ```bash
+  ./run shared --rtt 20 --bw 1000 --loss-range 0 --size 0.01 0.02 0.04 0.08 0.1 0.5 1 5 10 --switch 10.10.10.1 --h2 10.10.10.4 --remote-host 10.10.1.2 --cc2 cubic -c bbr -o figure8/lan
+  ```
 
-    To plot, we can use the following command:
+  To plot, we can use the following command:
     
-    ```bash
-    python3 plot.py line -i figure8/lan --split-host -n "BBR" "Cubic" -x buffer_size -y goodput -o figure8c.pdf --add-total --logx
-    ```
+  ```bash
+  python3 plot.py line -i figure8/lan --split-host -n "BBR" "Cubic" -x buffer_size -y goodput -o figure8c.pdf --add-total --logx
+  ```
 
 
 ## Setting up VMs for LAN test
 
 Unfortunately we have observed abnormal throughput result using Mininet. To obtain proper result, we need a VM-based LAN setup.
 We can use three VMs, all of which can be cloned from a base machine with randomized MAC addresses. We will use `h1`, `switch`,
-and `h3` to refer to three different VMs. We will use internal network to setup the proper connections.
+and `h3` to refer to three different VMs. We will use internal network to setup the proper connections. Also make sure that
+`Promiscuous Mode` is set to `Allow All`.
 
 - `h1`: Internal Network (`intnet-1`)
 - `h3`: Internal Network (`intnet-2`)
@@ -228,6 +229,7 @@ We then need to setup the static address manually by modifying the `/etc/netplan
     ethernets:
       eth0:
         dhcp4: no
+        addresses: [10.10.10.1/24]
         gateway4: 10.10.10.1
         routes:
           - to: 10.10.1.0/24
@@ -235,11 +237,13 @@ We then need to setup the static address manually by modifying the `/etc/netplan
             on-link: true
       eth1:
         dhcp4: no
+        addresses: [10.10.1.1/24]
         gateway4: 10.10.1.1
         routes:
           - to: 10.10.10.0/24
             via: 10.10.1.1
             on-link: true
+
   ```
 
 Here we let the two interface of `switch` route to each other, and we will control TCP traffic on `eth1`, which is linked to `h3` to
@@ -254,6 +258,3 @@ After setting each host's network configuration, we need to pally changes to `ne
 ```sh
 sudo netplan apply
 ```
-
-After that, we can add additional commands to the run script to use our VM topology:
-
