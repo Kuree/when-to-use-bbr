@@ -258,3 +258,31 @@ After setting each host's network configuration, we need to pally changes to `ne
 ```sh
 sudo netplan apply
 ```
+
+## Setting up VM for WAN
+We need to make some modification on the routes with `netplan`. Assume your EC2 instance has IP address or `13.14.15.16`, we need to add routes
+to our router VM. First we need to add another network interface with the `NAT` type to the VM, which we assume shows up in the VM as `eth3`. You
+should change to proper name based on your VM setup.
+
+`switch`:
+
+```yaml
+    eth3:
+      dhcp4: yes
+      routes:
+        - to: 13.0.0.0/8
+          via: 10.0.2.2
+          on-link: true
+```
+
+After apply the new netplan, make sure you can reach that EC2 instance either via `ping` or `traceroute`. Next, we need to enable the NAT routing
+table:
+
+```bash
+sudo iptables -t nat -A POSTROUTING -o eth3 -j MASQUERADE
+```
+
+After that, make sure you can ping the EC2 instance from `h1` and `h2`.
+
+To run the experiments, make sure you add `--remote-ssh-key` to the commands, which should point to your EC2 key-pair. We assume you use standard
+Ubuntu 20.04 LTS image to create the instance.
