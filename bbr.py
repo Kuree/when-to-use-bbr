@@ -90,8 +90,11 @@ def setup_mininet_iperf_server(node, port1, port2, configs):
             node.popen(cmd2, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def get_ssh_commands(host, commands, port=22, debug=False):
-    commands = ["ssh", f"mininet@{host}", "-p", f"{port}"] + commands
+def get_ssh_commands(host, commands, port=22, debug=False, username="mininet", id_file=""):
+    ssh_commands = ["ssh", f"{username}@{host}", "-p", f"{port}"]
+    if len(id_file) > 0:
+        ssh_commands += ["-i", id_file]
+    commands = ssh_commands + commands
     if debug:
         print("SSH cmd:", " ".join(commands))
     return commands
@@ -99,8 +102,14 @@ def get_ssh_commands(host, commands, port=22, debug=False):
 
 def setup_lan_iperf_server(port1, port2, configs):
     # killall the iperf3 server first
+    if configs.remote_host.split(".")[0] != "10":
+        # username is ubuntu
+        username = "ubuntu"
+    else:
+        username = "mininet"
+
     commands = get_ssh_commands(configs.remote_host, port=configs.remote_host_port, commands=["killall", "iperf3"],
-                                debug=configs.debug)
+                                debug=configs.debug, username=username, id_file=configs.remote_ssh_key)
     subprocess.call(commands, stderr=sys.stderr if configs.debug else subprocess.DEVNULL)
 
     cmd1, cmd2 = get_iperf3_server_commands(port1, port2)
@@ -108,7 +117,8 @@ def setup_lan_iperf_server(port1, port2, configs):
     processes = []
     commands = [cmd1, cmd2] if port2 is not None else [cmd1]
     for cmd in commands:
-        commands = get_ssh_commands(configs.remote_host, cmd.split(), configs.remote_host_port, )
+        commands = get_ssh_commands(configs.remote_host, cmd.split(), configs.remote_host_port, username=username,
+                                    id_file=configs.remote_ssh_key)
         if configs.debug:
             # need to ssh to the host and run that command
             print(configs.remote_host + ":", " ".join(commands))
@@ -188,6 +198,9 @@ def setup_lan(configs):
     for filename in {h1_result, h2_result}:
         if os.path.exists(filename):
             os.remove(filename)
+    # the LAN subnet is 10.x.x.x
+    if configs.remote_host.split(".")[0] != "10":
+        assert os.path.exists(configs.remote_ssh_key)
 
     h1_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port1, h1_result, configs.cc, configs)
     h2_commands = get_iperf3_client_cmd(configs.remote_host, tcp_port2, h2_result, configs.h2_cc, configs)
@@ -205,7 +218,10 @@ def setup_lan(configs):
         subprocess.check_call(tc_cmd)
 
     # we assume eth1 is the link that points to the host 3
-    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", "eth1", "root", "netem"]
+    eth = "eth1"
+    if configs.remote_host.split(".")[0] != "10":
+        eth = "eth3"
+    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", eth, "root", "netem"]
     # add delay
     tc_cmd += ["delay", f"{configs.rtt / 2}ms"]
     # add buffer size
@@ -256,7 +272,11 @@ def clear_lan_iperf3(configs):
     if configs.h2:
         cmd = get_ssh_commands(configs.h2_host, commands=cmd.split())
         subprocess.call(cmd, stderr=subprocess.DEVNULL)
-    cmd = "sudo tc qdisc del dev eth1 root netem"
+    eth = "eth1"
+    # if it's remote, goes through eth3
+    if configs.remote_host.split(".")[0] != "10":
+        eth = "eth3"
+    cmd = f"sudo tc qdisc del dev {eth} root netem"
     switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
     subprocess.call(switch_commands, stderr=subprocess.DEVNULL)
 
@@ -354,6 +374,7 @@ def main():
     parser.add_argument("--h2-host", default="localhost", dest="h2_host", help="h2 hostname", type=str)
     parser.add_argument("--switch", default="localhost", dest="switch", help="Switch IP address. Only usefully for LAN"
                         " and WAN", type=str)
+    parser.add_argument("--remote-ssh-key", default="", dest="remote_ssh_key", help="remote ssh identity key", type=str)
     # for mininet debug
     parser.add_argument("--mininet-debug", action="store_true", dest="mininet_debug")
     args = parser.parse_args()
