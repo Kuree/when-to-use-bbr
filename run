@@ -48,6 +48,8 @@ def parse_args():
             p.add_argument("--h2", help="h2 hostname", dest="h2", type=str, required=True)
             p.add_argument("--remote-ssh-key", help="Remote host ssh key file", dest="remote_ssh_key", type=str,
                            default="")
+            p.add_argument("--remote-eth", help="Network interface to the remote host", dest="remote_eth", type=str,
+                           default="eth1")
 
     return parser.parse_known_args()
 
@@ -69,6 +71,9 @@ def get_run_command(configs, rtt, bw, size, loss):
         commands += ["--remote-host", configs.remote_host]
         commands += ["--remote-user", configs.remote_user]
         commands += ["--switch", configs.switch]
+        commands += ["--remote-eth", configs.remote_eth]
+        if len(configs.remote_ssh_key) > 0:
+            commands += ["--remote-ssh-key", configs.remote_ssh_key]
     if configs.debug:
         commands += ["--debug"]
     if configs.command == "shared":
@@ -78,8 +83,6 @@ def get_run_command(configs, rtt, bw, size, loss):
         commands += ["--total-size", configs.total_size]
     else:
         commands += ["-t", configs.time]
-    if len(configs.remote_ssh_key) > 0:
-        commands += ["--remote-ssh-key", configs.remote_ssh_key]
     commands = [str(c) for c in commands]
     return commands
 

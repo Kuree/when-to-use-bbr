@@ -217,11 +217,7 @@ def setup_lan(configs):
         tc_cmd = get_ssh_commands(configs.h2_host, tc_cmd, debug=configs.debug)
         subprocess.check_call(tc_cmd)
 
-    # we assume eth1 is the link that points to the host 3
-    eth = "eth1"
-    if configs.remote_host.split(".")[0] != "10":
-        eth = "eth3"
-    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", eth, "root", "netem"]
+    tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", configs.remote_eth, "root", "netem"]
     # add delay
     tc_cmd += ["delay", f"{configs.rtt / 2}ms"]
     # add buffer size
@@ -272,11 +268,7 @@ def clear_lan_iperf3(configs):
     if configs.h2:
         cmd = get_ssh_commands(configs.h2_host, commands=cmd.split())
         subprocess.call(cmd, stderr=subprocess.DEVNULL)
-    eth = "eth1"
-    # if it's remote, goes through eth3
-    if configs.remote_host.split(".")[0] != "10":
-        eth = "eth3"
-    cmd = f"sudo tc qdisc del dev {eth} root netem"
+    cmd = f"sudo tc qdisc del dev {configs.remote_eth} root netem"
     switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
     subprocess.call(switch_commands, stderr=subprocess.DEVNULL)
 
@@ -375,6 +367,8 @@ def main():
     parser.add_argument("--switch", default="localhost", dest="switch", help="Switch IP address. Only usefully for LAN"
                         " and WAN", type=str)
     parser.add_argument("--remote-ssh-key", default="", dest="remote_ssh_key", help="remote ssh identity key", type=str)
+    parser.add_argument("--remote-eth", default="eth1", dest="remote_eth", help="Network interface to the remote host",
+                        type=str)
     # for mininet debug
     parser.add_argument("--mininet-debug", action="store_true", dest="mininet_debug")
     args = parser.parse_args()
