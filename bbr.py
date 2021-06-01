@@ -214,7 +214,7 @@ def setup_lan(configs):
     subprocess.check_call(tc_cmd)
     # apply this to h2 as well, if enabled
     if configs.h2:
-        tc_cmd = get_ssh_commands(configs.h2_host, tc_cmd, debug=configs.debug)
+        tc_cmd = get_ssh_commands(configs.h2_host, tc_cmd, debug=configs.debug, id_file=configs.remote_ssh_key)
         subprocess.check_call(tc_cmd)
 
     tc_cmd = ["sudo", "tc", "qdisc", "add", "dev", configs.remote_eth, "root", "netem"]
@@ -227,7 +227,7 @@ def setup_lan(configs):
     if configs.loss > 0:
         tc_cmd += ["loss", f"{int(configs.loss * 100)}%"]
     # need to ssh into the
-    switch_tc_commands = get_ssh_commands(configs.switch, commands=tc_cmd)
+    switch_tc_commands = get_ssh_commands(configs.switch, commands=tc_cmd, id_file=configs.remote_ssh_key)
     if configs.debug:
         print("switch:", " ".join(switch_tc_commands))
     subprocess.check_call(switch_tc_commands)
@@ -266,10 +266,10 @@ def clear_lan_iperf3(configs):
     cmd = "sudo tc qdisc del dev eth0 root netem"
     subprocess.call(cmd.split(), stderr=subprocess.DEVNULL)
     if configs.h2:
-        cmd = get_ssh_commands(configs.h2_host, commands=cmd.split())
+        cmd = get_ssh_commands(configs.h2_host, commands=cmd.split(), id_file=configs.remote_ssh_key)
         subprocess.call(cmd, stderr=subprocess.DEVNULL)
     cmd = f"sudo tc qdisc del dev {configs.remote_eth} root netem"
-    switch_commands = get_ssh_commands(configs.switch, commands=cmd.split())
+    switch_commands = get_ssh_commands(configs.switch, commands=cmd.split(), id_file=configs.remote_ssh_key)
     subprocess.call(switch_commands, stderr=subprocess.DEVNULL)
 
 

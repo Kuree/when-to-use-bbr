@@ -41,15 +41,15 @@ def parse_args():
         p.add_argument("--remote-host", type=str, dest="remote_host", required=True, help="Remote host name")
         p.add_argument("--remote-user", type=str, dest="remote_user", default="mininet", help="Remote user name")
         p.add_argument("--switch", type=str, dest="switch", required=True, help="Switch host name")
+        p.add_argument("--remote-eth", help="Network interface to the remote host", dest="remote_eth", type=str,
+                       default="eth1")
+        p.add_argument("--remote-ssh-key", help="Remote host ssh key file", dest="remote_ssh_key", type=str,
+                       default="")
 
         if command == "shared":
             p.add_argument("--cc2", help="Congestion control for host2", choices=ccs, dest="cc2",
                            type=str, required=True)
             p.add_argument("--h2", help="h2 hostname", dest="h2", type=str, required=True)
-            p.add_argument("--remote-ssh-key", help="Remote host ssh key file", dest="remote_ssh_key", type=str,
-                           default="")
-            p.add_argument("--remote-eth", help="Network interface to the remote host", dest="remote_eth", type=str,
-                           default="eth1")
 
     return parser.parse_known_args()
 
