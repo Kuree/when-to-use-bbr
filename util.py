@@ -22,7 +22,7 @@ def get_iperf_metrics(filename):
     # need to get mean RTT as well, which is the latency
     stream = end["streams"][0]  # only one stream
     sender = stream["sender"]
-    mean_rtt = sender["mean_rtt"]
+    mean_rtt = sum_received["seconds"]
     return goodput, mean_rtt, retransmits
 
 
